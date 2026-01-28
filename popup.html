@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GoPhishFree Dashboard</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      width: 400px;
+      min-height: 500px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f8f9fa;
+    }
+    
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 20px;
+      text-align: center;
+    }
+    
+    .header h1 {
+      font-size: 24px;
+      margin-bottom: 5px;
+    }
+    
+    .header p {
+      font-size: 12px;
+      opacity: 0.9;
+    }
+    
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+      padding: 20px;
+    }
+    
+    .stat-card {
+      background: white;
+      padding: 15px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+    
+    .stat-value {
+      font-size: 32px;
+      font-weight: bold;
+      color: #667eea;
+      margin-bottom: 5px;
+    }
+    
+    .stat-label {
+      font-size: 12px;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .flagged-count {
+      color: #dc3545;
+    }
+    
+    .content {
+      padding: 0 20px 20px;
+    }
+    
+    .section-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 15px;
+      color: #333;
+    }
+    
+    .flagged-list {
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    
+    .flagged-item {
+      padding: 15px;
+      border-bottom: 1px solid #eee;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    
+    .flagged-item:hover {
+      background: #f8f9fa;
+    }
+    
+    .flagged-item:last-child {
+      border-bottom: none;
+    }
+    
+    .flagged-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    
+    .flagged-domain {
+      font-weight: 600;
+      color: #333;
+      font-size: 14px;
+    }
+    
+    .flagged-score {
+      padding: 4px 8px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    
+    .flagged-score.high {
+      background: #f8d7da;
+      color: #721c24;
+    }
+    
+    .flagged-score.medium {
+      background: #fff3cd;
+      color: #856404;
+    }
+    
+    .flagged-reason {
+      font-size: 12px;
+      color: #666;
+      margin-top: 5px;
+    }
+    
+    .flagged-time {
+      font-size: 11px;
+      color: #999;
+      margin-top: 5px;
+    }
+    
+    .actions {
+      padding: 20px;
+      border-top: 1px solid #eee;
+      display: flex;
+      gap: 10px;
+    }
+    
+    .btn {
+      flex: 1;
+      padding: 10px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .btn-primary {
+      background: #667eea;
+      color: white;
+    }
+    
+    .btn-primary:hover {
+      background: #5568d3;
+    }
+    
+    .btn-secondary {
+      background: #6c757d;
+      color: white;
+    }
+    
+    .btn-secondary:hover {
+      background: #5a6268;
+    }
+    
+    .empty-state {
+      padding: 40px 20px;
+      text-align: center;
+      color: #999;
+    }
+    
+    .empty-state-icon {
+      font-size: 48px;
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>🛡️ GoPhishFree</h1>
+    <p>Phishing Detection Dashboard</p>
+  </div>
+  
+  <div class="stats">
+    <div class="stat-card">
+      <div class="stat-value" id="total-scanned">0</div>
+      <div class="stat-label">Emails Scanned</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value flagged-count" id="flagged-count">0</div>
+      <div class="stat-label">Flagged</div>
+    </div>
+  </div>
+  
+  <div class="content">
+    <div class="section-title">Flagged Emails</div>
+    <div class="flagged-list" id="flagged-list">
+      <div class="empty-state">
+        <div class="empty-state-icon">📧</div>
+        <div>No flagged emails yet</div>
+        <div style="font-size: 11px; margin-top: 5px;">Open emails in Gmail to scan them</div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="actions">
+    <button class="btn btn-primary" id="refresh-btn">Refresh</button>
+    <button class="btn btn-secondary" id="clear-btn">Clear History</button>
+  </div>
+  
+  <script src="popup.js"></script>
+</body>
+</html>

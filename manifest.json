@@ -1,0 +1,43 @@
+{
+  "manifest_version": 3,
+  "name": "GoPhishFree",
+  "version": "1.0.0",
+  "description": "Detect and manage suspected phishing emails with ML-based risk scoring",
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://mail.google.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://mail.google.com/*"],
+      "js": ["featureExtractor.js", "content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "Assets/Logo.png",
+      "48": "Assets/Logo.png",
+      "128": "Assets/Logo.png"
+    }
+  },
+  "icons": {
+    "16": "Assets/Logo.png",
+    "48": "Assets/Logo.png",
+    "128": "Assets/Logo.png"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["sidepanel.html", "model/*"],
+      "matches": ["https://mail.google.com/*"]
+    }
+  ]
+}

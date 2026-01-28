@@ -1,0 +1,179 @@
+/* GoPhishFree Content Script Styles */
+
+.gophishfree-risk-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  margin-left: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.gophishfree-risk-badge:hover {
+  transform: scale(1.05);
+}
+
+.gophishfree-risk-badge.low {
+  background-color: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.gophishfree-risk-badge.medium {
+  background-color: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffeaa7;
+}
+
+.gophishfree-risk-badge.high {
+  background-color: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
+
+.gophishfree-sidepanel {
+  position: fixed;
+  top: 0;
+  right: -400px;
+  width: 400px;
+  height: 100vh;
+  background: white;
+  box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
+  z-index: 10000;
+  transition: right 0.3s ease;
+  overflow-y: auto;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.gophishfree-sidepanel.open {
+  right: 0;
+}
+
+.gophishfree-sidepanel-header {
+  padding: 20px;
+  background: #f8f9fa;
+  border-bottom: 1px solid #dee2e6;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.gophishfree-sidepanel-header h2 {
+  margin: 0;
+  font-size: 18px;
+  color: #333;
+}
+
+.gophishfree-sidepanel-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #666;
+  padding: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.gophishfree-sidepanel-close:hover {
+  color: #000;
+}
+
+.gophishfree-sidepanel-content {
+  padding: 20px;
+}
+
+.gophishfree-score-display {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.gophishfree-score-value {
+  font-size: 48px;
+  font-weight: bold;
+  margin: 10px 0;
+}
+
+.gophishfree-score-value.low {
+  color: #28a745;
+}
+
+.gophishfree-score-value.medium {
+  color: #ffc107;
+}
+
+.gophishfree-score-value.high {
+  color: #dc3545;
+}
+
+.gophishfree-reasons {
+  margin-bottom: 30px;
+}
+
+.gophishfree-reasons h3 {
+  font-size: 16px;
+  margin-bottom: 15px;
+  color: #333;
+}
+
+.gophishfree-reason-item {
+  padding: 10px;
+  margin-bottom: 8px;
+  background: #f8f9fa;
+  border-left: 3px solid #007bff;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.gophishfree-links {
+  margin-bottom: 30px;
+}
+
+.gophishfree-links h3 {
+  font-size: 16px;
+  margin-bottom: 15px;
+  color: #333;
+}
+
+.gophishfree-link-item {
+  padding: 10px;
+  margin-bottom: 8px;
+  background: #f8f9fa;
+  border-radius: 4px;
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.gophishfree-link-item.suspicious {
+  border-left: 3px solid #dc3545;
+}
+
+.gophishfree-link-url {
+  color: #007bff;
+  text-decoration: none;
+}
+
+.gophishfree-link-url:hover {
+  text-decoration: underline;
+}
+
+.gophishfree-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.3);
+  z-index: 9999;
+  display: none;
+}
+
+.gophishfree-overlay.show {
+  display: block;
+}
