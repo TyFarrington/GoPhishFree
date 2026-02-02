@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GoPhishFree Dashboard</title>
+  <title>GoPhishFree - Fish Tank</title>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     * {
       margin: 0;
@@ -11,218 +12,685 @@
       box-sizing: border-box;
     }
     
+    html {
+      background: #0a1628;
+    }
+    
     body {
-      width: 400px;
-      min-height: 500px;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #f8f9fa;
-    }
-    
-    .header {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      padding: 20px;
-      text-align: center;
-    }
-    
-    .header h1 {
-      font-size: 24px;
-      margin-bottom: 5px;
-    }
-    
-    .header p {
-      font-size: 12px;
-      opacity: 0.9;
-    }
-    
-    .stats {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 15px;
-      padding: 20px;
-    }
-    
-    .stat-card {
-      background: white;
-      padding: 15px;
-      border-radius: 8px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-      text-align: center;
-    }
-    
-    .stat-value {
-      font-size: 32px;
-      font-weight: bold;
-      color: #667eea;
-      margin-bottom: 5px;
-    }
-    
-    .stat-label {
-      font-size: 12px;
-      color: #666;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-    
-    .flagged-count {
-      color: #dc3545;
-    }
-    
-    .content {
-      padding: 0 20px 20px;
-    }
-    
-    .section-title {
-      font-size: 16px;
-      font-weight: 600;
-      margin-bottom: 15px;
-      color: #333;
-    }
-    
-    .flagged-list {
-      background: white;
-      border-radius: 8px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-      max-height: 300px;
+      width: 420px;
+      min-height: 520px;
+      font-family: 'Quicksand', sans-serif;
+      background: linear-gradient(180deg, #0a1628 0%, #0d2847 50%, #1a4a6e 100%);
+      background-attachment: fixed;
+      overflow-x: hidden;
       overflow-y: auto;
     }
     
-    .flagged-item {
-      padding: 15px;
-      border-bottom: 1px solid #eee;
+    /* Header */
+    .header {
+      background: linear-gradient(135deg, #1e3a5f 0%, #0a1628 100%);
+      padding: 16px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid rgba(64, 224, 208, 0.3);
+      position: relative;
+      z-index: 10;
+    }
+    
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    
+    .logo {
+      font-family: 'Fredoka One', cursive;
+      font-size: 22px;
+      color: #40e0d0;
+      text-shadow: 0 0 20px rgba(64, 224, 208, 0.5);
+      letter-spacing: 1px;
+    }
+    
+    .logo-icon {
+      font-size: 28px;
+      filter: drop-shadow(0 0 10px rgba(64, 224, 208, 0.6));
+    }
+    
+    .stats-mini {
+      display: flex;
+      gap: 12px;
+    }
+    
+    .stat-mini {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      background: rgba(255, 255, 255, 0.1);
+      padding: 6px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      color: #b8d4e3;
+    }
+    
+    .stat-mini .value {
+      font-weight: 700;
+      color: #40e0d0;
+    }
+    
+    /* Fish Tank */
+    .fish-tank {
+      position: relative;
+      height: 300px;
+      margin: 12px;
+      border-radius: 20px;
+      background: linear-gradient(180deg, 
+        rgba(10, 60, 100, 0.9) 0%, 
+        rgba(15, 80, 130, 0.85) 40%,
+        rgba(20, 100, 150, 0.8) 70%,
+        rgba(194, 178, 128, 0.6) 100%
+      );
+      border: 4px solid #2d5a7b;
+      box-shadow: 
+        inset 0 0 60px rgba(0, 100, 150, 0.4),
+        0 8px 32px rgba(0, 0, 0, 0.4),
+        0 0 0 2px rgba(64, 224, 208, 0.2);
+      overflow: hidden;
+    }
+    
+    /* Water surface effect */
+    .water-surface {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 8px;
+      background: linear-gradient(180deg, 
+        rgba(255, 255, 255, 0.3) 0%,
+        rgba(64, 224, 208, 0.2) 50%,
+        transparent 100%
+      );
+      animation: waveSurface 3s ease-in-out infinite;
+    }
+    
+    @keyframes waveSurface {
+      0%, 100% { transform: translateY(0); opacity: 0.6; }
+      50% { transform: translateY(2px); opacity: 0.8; }
+    }
+    
+    /* Bubbles */
+    .bubbles {
+      position: absolute;
+      bottom: 40px;
+      left: 20px;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+    
+    .bubble {
+      position: absolute;
+      bottom: 0;
+      background: radial-gradient(circle at 30% 30%, 
+        rgba(255, 255, 255, 0.8) 0%,
+        rgba(64, 224, 208, 0.3) 50%,
+        transparent 70%
+      );
+      border-radius: 50%;
+      animation: bubbleRise linear infinite;
+    }
+    
+    @keyframes bubbleRise {
+      0% { 
+        transform: translateY(0) scale(1); 
+        opacity: 0.7; 
+      }
+      100% { 
+        transform: translateY(-280px) scale(0.5); 
+        opacity: 0; 
+      }
+    }
+    
+    /* Sand and decorations */
+    .tank-floor {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 40px;
+      background: linear-gradient(180deg, 
+        rgba(194, 178, 128, 0.4) 0%,
+        rgba(194, 178, 128, 0.8) 50%,
+        rgba(160, 140, 100, 0.9) 100%
+      );
+      border-radius: 0 0 16px 16px;
+    }
+    
+    .seaweed {
+      position: absolute;
+      bottom: 30px;
+      width: 12px;
+      background: linear-gradient(180deg, #2d8b57 0%, #1a5c3a 100%);
+      border-radius: 6px 6px 2px 2px;
+      transform-origin: bottom center;
+      animation: seaweedSway 4s ease-in-out infinite;
+    }
+    
+    @keyframes seaweedSway {
+      0%, 100% { transform: rotate(-5deg); }
+      50% { transform: rotate(5deg); }
+    }
+    
+    .coral {
+      position: absolute;
+      bottom: 30px;
+      font-size: 30px;
+      filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+    }
+    
+    .treasure-chest {
+      position: absolute;
+      bottom: 32px;
+      right: 30px;
+      font-size: 28px;
+      filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.4));
+      animation: chestGlow 2s ease-in-out infinite;
+    }
+    
+    @keyframes chestGlow {
+      0%, 100% { filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.4)); }
+      50% { filter: drop-shadow(0 2px 15px rgba(255, 215, 0, 0.6)); }
+    }
+    
+    /* Fish container */
+    .fish-container {
+      position: absolute;
+      top: 20px;
+      left: 10px;
+      right: 10px;
+      bottom: 50px;
+      overflow: hidden;
+    }
+    
+    /* Swimming fish */
+    .fish {
+      position: absolute;
+      font-size: 32px;
       cursor: pointer;
-      transition: background 0.2s;
+      transition: transform 0.1s;
+      filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+      z-index: 5;
     }
     
-    .flagged-item:hover {
-      background: #f8f9fa;
+    .fish:hover {
+      transform: scale(1.2);
+      filter: drop-shadow(0 4px 12px rgba(64, 224, 208, 0.6));
     }
     
-    .flagged-item:last-child {
-      border-bottom: none;
+    .fish.swimming-right {
+      animation: swimRight linear infinite;
     }
     
-    .flagged-header {
+    .fish.swimming-left {
+      animation: swimLeft linear infinite;
+      transform: scaleX(-1);
+    }
+    
+    @keyframes swimRight {
+      0% { 
+        transform: translateX(-50px) translateY(0); 
+      }
+      25% { 
+        transform: translateX(calc(25% - 50px)) translateY(-10px); 
+      }
+      50% { 
+        transform: translateX(calc(50% - 50px)) translateY(5px); 
+      }
+      75% { 
+        transform: translateX(calc(75% - 50px)) translateY(-5px); 
+      }
+      100% { 
+        transform: translateX(calc(100% + 50px)) translateY(0); 
+      }
+    }
+    
+    @keyframes swimLeft {
+      0% { 
+        transform: scaleX(-1) translateX(-50px) translateY(0); 
+      }
+      25% { 
+        transform: scaleX(-1) translateX(calc(25% - 50px)) translateY(8px); 
+      }
+      50% { 
+        transform: scaleX(-1) translateX(calc(50% - 50px)) translateY(-8px); 
+      }
+      75% { 
+        transform: scaleX(-1) translateX(calc(75% - 50px)) translateY(5px); 
+      }
+      100% { 
+        transform: scaleX(-1) translateX(calc(100% + 50px)) translateY(0); 
+      }
+    }
+    
+    /* Empty tank state */
+    .empty-tank {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      color: rgba(255, 255, 255, 0.6);
+      z-index: 10;
+    }
+    
+    .empty-tank-icon {
+      font-size: 48px;
+      margin-bottom: 12px;
+      opacity: 0.5;
+      animation: emptyBob 3s ease-in-out infinite;
+    }
+    
+    @keyframes emptyBob {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+    
+    .empty-tank-text {
+      font-size: 14px;
+      font-weight: 500;
+    }
+    
+    .empty-tank-subtext {
+      font-size: 11px;
+      margin-top: 6px;
+      opacity: 0.7;
+    }
+    
+    /* Fish collection panel */
+    .collection-panel {
+      margin: 0 12px 12px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 16px;
+      border: 1px solid rgba(64, 224, 208, 0.2);
+      overflow: hidden;
+    }
+    
+    .collection-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 16px;
+      background: rgba(0, 0, 0, 0.2);
+      border-bottom: 1px solid rgba(64, 224, 208, 0.15);
+    }
+    
+    .collection-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #40e0d0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .collection-count {
+      font-size: 12px;
+      color: #b8d4e3;
+      background: rgba(64, 224, 208, 0.2);
+      padding: 4px 10px;
+      border-radius: 12px;
+    }
+    
+    .fish-types {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      padding: 12px;
+    }
+    
+    .fish-type {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 10px 6px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      transition: all 0.2s;
+    }
+    
+    .fish-type:hover {
+      background: rgba(64, 224, 208, 0.1);
+      border-color: rgba(64, 224, 208, 0.3);
+      transform: translateY(-2px);
+    }
+    
+    .fish-type-icon {
+      font-size: 24px;
+      margin-bottom: 4px;
+    }
+    
+    .fish-type-count {
+      font-size: 14px;
+      font-weight: 700;
+      color: #fff;
+    }
+    
+    .fish-type-name {
+      font-size: 9px;
+      color: #b8d4e3;
+      text-align: center;
+      margin-top: 2px;
+    }
+    
+    .fish-type.locked {
+      opacity: 0.4;
+    }
+    
+    .fish-type.locked .fish-type-icon {
+      filter: grayscale(1);
+    }
+    
+    /* Recent catches */
+    .recent-section {
+      margin: 0 12px;
+      padding-bottom: 16px;
+    }
+    
+    .section-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
       margin-bottom: 8px;
     }
     
-    .flagged-domain {
+    .section-title {
+      font-size: 13px;
       font-weight: 600;
-      color: #333;
-      font-size: 14px;
+      color: #b8d4e3;
     }
     
-    .flagged-score {
-      padding: 4px 8px;
-      border-radius: 12px;
-      font-size: 12px;
-      font-weight: 600;
-    }
-    
-    .flagged-score.high {
-      background: #f8d7da;
-      color: #721c24;
-    }
-    
-    .flagged-score.medium {
-      background: #fff3cd;
-      color: #856404;
-    }
-    
-    .flagged-reason {
-      font-size: 12px;
-      color: #666;
-      margin-top: 5px;
-    }
-    
-    .flagged-time {
+    .clear-btn {
       font-size: 11px;
-      color: #999;
-      margin-top: 5px;
-    }
-    
-    .actions {
-      padding: 20px;
-      border-top: 1px solid #eee;
-      display: flex;
-      gap: 10px;
-    }
-    
-    .btn {
-      flex: 1;
-      padding: 10px;
+      color: rgba(255, 255, 255, 0.5);
+      background: none;
       border: none;
-      border-radius: 6px;
-      font-size: 14px;
-      font-weight: 600;
       cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 8px;
       transition: all 0.2s;
     }
     
-    .btn-primary {
-      background: #667eea;
-      color: white;
+    .clear-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #ff6b6b;
     }
     
-    .btn-primary:hover {
-      background: #5568d3;
+    .recent-list {
+      max-height: 100px;
+      overflow-y: auto;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
     }
     
-    .btn-secondary {
-      background: #6c757d;
-      color: white;
+    .recent-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      cursor: pointer;
+      transition: background 0.2s;
     }
     
-    .btn-secondary:hover {
-      background: #5a6268;
+    .recent-item:last-child {
+      border-bottom: none;
     }
     
-    .empty-state {
-      padding: 40px 20px;
+    .recent-item:hover {
+      background: rgba(64, 224, 208, 0.1);
+    }
+    
+    .recent-fish {
+      font-size: 20px;
+    }
+    
+    .recent-info {
+      flex: 1;
+      min-width: 0;
+    }
+    
+    .recent-domain {
+      font-size: 12px;
+      font-weight: 600;
+      color: #fff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    
+    .recent-time {
+      font-size: 10px;
+      color: rgba(255, 255, 255, 0.5);
+    }
+    
+    .recent-score {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 10px;
+    }
+    
+    .recent-score.high {
+      background: rgba(255, 107, 107, 0.3);
+      color: #ff6b6b;
+    }
+    
+    .recent-score.medium {
+      background: rgba(255, 193, 7, 0.3);
+      color: #ffc107;
+    }
+    
+    .recent-score.low {
+      background: rgba(64, 224, 208, 0.3);
+      color: #40e0d0;
+    }
+    
+    .empty-recent {
+      padding: 20px;
       text-align: center;
-      color: #999;
+      color: rgba(255, 255, 255, 0.4);
+      font-size: 12px;
     }
     
-    .empty-state-icon {
-      font-size: 48px;
-      margin-bottom: 10px;
+    /* Light rays effect */
+    .light-rays {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      width: 200%;
+      height: 100%;
+      transform: translateX(-50%);
+      background: repeating-linear-gradient(
+        105deg,
+        transparent 0px,
+        transparent 40px,
+        rgba(255, 255, 255, 0.02) 40px,
+        rgba(255, 255, 255, 0.02) 80px
+      );
+      pointer-events: none;
+      animation: rayShift 20s linear infinite;
+    }
+    
+    @keyframes rayShift {
+      0% { transform: translateX(-50%) translateY(-10%); }
+      100% { transform: translateX(-50%) translateY(10%); }
+    }
+    
+    /* Scrollbar styling */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+    
+    ::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 3px;
+    }
+    
+    ::-webkit-scrollbar-thumb {
+      background: rgba(64, 224, 208, 0.4);
+      border-radius: 3px;
+    }
+    
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(64, 224, 208, 0.6);
+    }
+    
+    /* Ensure no white background peeks through */
+    ::-webkit-scrollbar-corner {
+      background: #0a1628;
+    }
+    
+    /* New fish animation */
+    @keyframes newFishSplash {
+      0% { 
+        transform: scale(0) translateY(50px);
+        opacity: 0;
+      }
+      50% {
+        transform: scale(1.3) translateY(-10px);
+        opacity: 1;
+      }
+      100% {
+        transform: scale(1) translateY(0);
+        opacity: 1;
+      }
+    }
+    
+    .fish.new-catch {
+      animation: newFishSplash 0.6s ease-out forwards;
+    }
+    
+    /* Tooltip */
+    .fish-tooltip {
+      position: absolute;
+      background: rgba(0, 0, 0, 0.85);
+      color: #fff;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 11px;
+      pointer-events: none;
+      z-index: 100;
+      opacity: 0;
+      transition: opacity 0.2s;
+      white-space: nowrap;
+      border: 1px solid rgba(64, 224, 208, 0.3);
+    }
+    
+    .fish-tooltip.show {
+      opacity: 1;
+    }
+    
+    .tooltip-title {
+      font-weight: 700;
+      color: #40e0d0;
+      margin-bottom: 4px;
+    }
+    
+    .tooltip-detail {
+      color: rgba(255, 255, 255, 0.7);
     }
   </style>
 </head>
 <body>
   <div class="header">
-    <h1>🛡️ GoPhishFree</h1>
-    <p>Phishing Detection Dashboard</p>
-  </div>
-  
-  <div class="stats">
-    <div class="stat-card">
-      <div class="stat-value" id="total-scanned">0</div>
-      <div class="stat-label">Emails Scanned</div>
+    <div class="header-left">
+      <span class="logo-icon">🐟</span>
+      <span class="logo">GoPhishFree</span>
     </div>
-    <div class="stat-card">
-      <div class="stat-value flagged-count" id="flagged-count">0</div>
-      <div class="stat-label">Flagged</div>
-    </div>
-  </div>
-  
-  <div class="content">
-    <div class="section-title">Flagged Emails</div>
-    <div class="flagged-list" id="flagged-list">
-      <div class="empty-state">
-        <div class="empty-state-icon">📧</div>
-        <div>No flagged emails yet</div>
-        <div style="font-size: 11px; margin-top: 5px;">Open emails in Gmail to scan them</div>
+    <div class="stats-mini">
+      <div class="stat-mini">
+        <span>📧</span>
+        <span class="value" id="total-scanned">0</span>
+      </div>
+      <div class="stat-mini">
+        <span>🎣</span>
+        <span class="value" id="fish-caught">0</span>
       </div>
     </div>
   </div>
   
-  <div class="actions">
-    <button class="btn btn-primary" id="refresh-btn">Refresh</button>
-    <button class="btn btn-secondary" id="clear-btn">Clear History</button>
+  <div class="fish-tank" id="fish-tank">
+    <div class="light-rays"></div>
+    <div class="water-surface"></div>
+    <div class="bubbles" id="bubbles"></div>
+    
+    <div class="fish-container" id="fish-container">
+      <div class="empty-tank" id="empty-tank">
+        <div class="empty-tank-icon">🐠</div>
+        <div class="empty-tank-text">Your tank is empty!</div>
+        <div class="empty-tank-subtext">Scan emails in Gmail to catch phish</div>
+      </div>
+    </div>
+    
+    <!-- Decorations -->
+    <div class="tank-floor"></div>
+    <div class="seaweed" style="left: 25px; height: 50px;"></div>
+    <div class="seaweed" style="left: 40px; height: 70px; animation-delay: -1s;"></div>
+    <div class="seaweed" style="left: 55px; height: 45px; animation-delay: -2s;"></div>
+    <div class="seaweed" style="right: 80px; height: 60px; animation-delay: -0.5s;"></div>
+    <div class="seaweed" style="right: 95px; height: 40px; animation-delay: -1.5s;"></div>
+    <div class="coral" style="left: 80px;">🪸</div>
+    <div class="coral" style="right: 120px;">🪸</div>
+    <div class="treasure-chest">📦</div>
+  </div>
+  
+  <div class="collection-panel">
+    <div class="collection-header">
+      <div class="collection-title">
+        <span>🏆</span>
+        <span>Fish Collection</span>
+      </div>
+      <div class="collection-count" id="collection-count">0 / 4 types</div>
+    </div>
+    <div class="fish-types" id="fish-types">
+      <div class="fish-type" data-type="friendly" title="Low Risk (0-39)">
+        <span class="fish-type-icon">🐟</span>
+        <span class="fish-type-count" id="count-friendly">0</span>
+        <span class="fish-type-name">Friendly</span>
+      </div>
+      <div class="fish-type" data-type="suspicious" title="Medium Risk (40-69)">
+        <span class="fish-type-icon">🐠</span>
+        <span class="fish-type-count" id="count-suspicious">0</span>
+        <span class="fish-type-name">Suspicious</span>
+      </div>
+      <div class="fish-type" data-type="phishy" title="High Risk (70-89)">
+        <span class="fish-type-icon">🐡</span>
+        <span class="fish-type-count" id="count-phishy">0</span>
+        <span class="fish-type-name">Phishy</span>
+      </div>
+      <div class="fish-type" data-type="shark" title="Dangerous (90+)">
+        <span class="fish-type-icon">🦈</span>
+        <span class="fish-type-count" id="count-shark">0</span>
+        <span class="fish-type-name">Mega Phish</span>
+      </div>
+    </div>
+  </div>
+  
+  <div class="recent-section">
+    <div class="section-header">
+      <span class="section-title">Recent Catches</span>
+      <button class="clear-btn" id="clear-btn">Clear All</button>
+    </div>
+    <div class="recent-list" id="recent-list">
+      <div class="empty-recent">No catches yet - start scanning!</div>
+    </div>
+  </div>
+  
+  <div class="fish-tooltip" id="fish-tooltip">
+    <div class="tooltip-title"></div>
+    <div class="tooltip-detail"></div>
   </div>
   
   <script src="popup.js"></script>
