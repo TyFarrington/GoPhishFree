@@ -1,49 +1,228 @@
-/* GoPhishFree Content Script Styles */
+/* GoPhishFree Content Script Styles - Fish Theme Edition */
 
+/* Fish Risk Badge */
 .gophishfree-risk-badge {
   display: inline-flex;
   align-items: center;
-  padding: 4px 12px;
-  border-radius: 12px;
-  font-size: 12px;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 13px;
   font-weight: 600;
-  margin-left: 8px;
+  margin-left: 12px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  position: relative;
+  overflow: hidden;
+}
+
+.gophishfree-risk-badge::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+  transition: left 0.5s;
+}
+
+.gophishfree-risk-badge:hover::before {
+  left: 100%;
 }
 
 .gophishfree-risk-badge:hover {
-  transform: scale(1.05);
+  transform: scale(1.08) translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
+.gophishfree-fish-icon {
+  font-size: 18px;
+  animation: fishSwim 2s ease-in-out infinite;
+}
+
+@keyframes fishSwim {
+  0%, 100% { transform: translateX(0) rotate(0deg); }
+  25% { transform: translateX(2px) rotate(3deg); }
+  75% { transform: translateX(-2px) rotate(-3deg); }
+}
+
+/* Low Risk - Friendly Fish */
 .gophishfree-risk-badge.low {
-  background-color: #d4edda;
+  background: linear-gradient(135deg, #d4edda 0%, #b8e0c8 100%);
   color: #155724;
-  border: 1px solid #c3e6cb;
+  border: 2px solid #9fdfb4;
+  box-shadow: 0 2px 8px rgba(40, 167, 69, 0.2);
 }
 
+.gophishfree-risk-badge.low:hover {
+  background: linear-gradient(135deg, #c3e6cb 0%, #a8d9b8 100%);
+}
+
+/* Medium Risk - Suspicious Fish */
 .gophishfree-risk-badge.medium {
-  background-color: #fff3cd;
+  background: linear-gradient(135deg, #fff3cd 0%, #ffe8a1 100%);
   color: #856404;
-  border: 1px solid #ffeaa7;
+  border: 2px solid #ffc107;
+  box-shadow: 0 2px 8px rgba(255, 193, 7, 0.25);
 }
 
+.gophishfree-risk-badge.medium:hover {
+  background: linear-gradient(135deg, #ffeaa7 0%, #ffd93d 100%);
+}
+
+/* High Risk - Phishy Puffer */
 .gophishfree-risk-badge.high {
-  background-color: #f8d7da;
+  background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
   color: #721c24;
-  border: 1px solid #f5c6cb;
+  border: 2px solid #f5c6cb;
+  box-shadow: 0 2px 8px rgba(220, 53, 69, 0.25);
+  animation: phishyPulse 2s ease-in-out infinite;
 }
 
+.gophishfree-risk-badge.high:hover {
+  background: linear-gradient(135deg, #f5c6cb 0%, #f1b0b7 100%);
+}
+
+@keyframes phishyPulse {
+  0%, 100% { box-shadow: 0 2px 8px rgba(220, 53, 69, 0.25); }
+  50% { box-shadow: 0 2px 16px rgba(220, 53, 69, 0.4); }
+}
+
+/* Dangerous - Shark */
+.gophishfree-risk-badge.dangerous {
+  background: linear-gradient(135deg, #721c24 0%, #4a0d12 100%);
+  color: #fff;
+  border: 2px solid #dc3545;
+  box-shadow: 0 2px 12px rgba(220, 53, 69, 0.4);
+  animation: sharkAlert 1s ease-in-out infinite;
+}
+
+.gophishfree-risk-badge.dangerous:hover {
+  background: linear-gradient(135deg, #8b1e26 0%, #5c0f16 100%);
+}
+
+@keyframes sharkAlert {
+  0%, 100% { 
+    box-shadow: 0 2px 12px rgba(220, 53, 69, 0.4);
+    transform: scale(1);
+  }
+  50% { 
+    box-shadow: 0 4px 20px rgba(220, 53, 69, 0.6);
+    transform: scale(1.02);
+  }
+}
+
+/* Fish Caught Animation */
+.gophishfree-fish-caught {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 10001;
+  background: rgba(10, 22, 40, 0.95);
+  padding: 30px 50px;
+  border-radius: 20px;
+  text-align: center;
+  animation: fishCaughtPopup 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  border: 3px solid rgba(64, 224, 208, 0.5);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+}
+
+@keyframes fishCaughtPopup {
+  0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+  100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+}
+
+.gophishfree-fish-caught-icon {
+  font-size: 72px;
+  animation: caughtFishBounce 0.8s ease-in-out;
+  display: block;
+  margin-bottom: 15px;
+}
+
+@keyframes caughtFishBounce {
+  0% { transform: translateY(50px) scale(0); }
+  50% { transform: translateY(-20px) scale(1.2); }
+  70% { transform: translateY(5px) scale(0.95); }
+  100% { transform: translateY(0) scale(1); }
+}
+
+.gophishfree-fish-caught-title {
+  font-family: 'Fredoka One', cursive, sans-serif;
+  font-size: 24px;
+  color: #40e0d0;
+  margin-bottom: 8px;
+  text-shadow: 0 0 20px rgba(64, 224, 208, 0.5);
+}
+
+.gophishfree-fish-caught-subtitle {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.gophishfree-fish-caught-score {
+  margin-top: 12px;
+  font-size: 18px;
+  font-weight: 700;
+  padding: 8px 20px;
+  border-radius: 20px;
+  display: inline-block;
+}
+
+.gophishfree-fish-caught-score.low {
+  background: rgba(40, 167, 69, 0.3);
+  color: #4ade80;
+}
+
+.gophishfree-fish-caught-score.medium {
+  background: rgba(255, 193, 7, 0.3);
+  color: #ffc107;
+}
+
+.gophishfree-fish-caught-score.high {
+  background: rgba(220, 53, 69, 0.3);
+  color: #ff6b6b;
+}
+
+.gophishfree-fish-caught-score.dangerous {
+  background: rgba(220, 53, 69, 0.5);
+  color: #fff;
+}
+
+/* Splash effect overlay */
+.gophishfree-splash-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 10000;
+  background: radial-gradient(circle at center, 
+    rgba(64, 224, 208, 0.1) 0%, 
+    transparent 70%
+  );
+  animation: splashFade 1s ease-out forwards;
+}
+
+@keyframes splashFade {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* Side Panel Styles - Updated for fish theme */
 .gophishfree-sidepanel {
   position: fixed;
   top: 0;
-  right: -400px;
-  width: 400px;
+  right: -420px;
+  width: 420px;
   height: 100vh;
-  background: white;
-  box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
+  background: linear-gradient(180deg, #0a1628 0%, #0d2847 50%, #1a4a6e 100%);
+  box-shadow: -4px 0 30px rgba(0, 0, 0, 0.3);
   z-index: 10000;
-  transition: right 0.3s ease;
+  transition: right 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
   overflow-y: auto;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
@@ -53,9 +232,9 @@
 }
 
 .gophishfree-sidepanel-header {
-  padding: 20px;
-  background: #f8f9fa;
-  border-bottom: 1px solid #dee2e6;
+  padding: 24px;
+  background: linear-gradient(135deg, #1e3a5f 0%, #0a1628 100%);
+  border-bottom: 2px solid rgba(64, 224, 208, 0.3);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -63,45 +242,68 @@
 
 .gophishfree-sidepanel-header h2 {
   margin: 0;
-  font-size: 18px;
-  color: #333;
+  font-size: 20px;
+  color: #40e0d0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.gophishfree-sidepanel-header h2::before {
+  content: '🐟';
+  font-size: 24px;
 }
 
 .gophishfree-sidepanel-close {
-  background: none;
+  background: rgba(255, 255, 255, 0.1);
   border: none;
   font-size: 24px;
   cursor: pointer;
-  color: #666;
+  color: rgba(255, 255, 255, 0.7);
   padding: 0;
-  width: 30px;
-  height: 30px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: all 0.2s;
 }
 
 .gophishfree-sidepanel-close:hover {
-  color: #000;
+  background: rgba(255, 107, 107, 0.2);
+  color: #ff6b6b;
 }
 
 .gophishfree-sidepanel-content {
-  padding: 20px;
+  padding: 24px;
 }
 
 .gophishfree-score-display {
   text-align: center;
   margin-bottom: 30px;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 16px;
+  border: 1px solid rgba(64, 224, 208, 0.15);
+}
+
+.gophishfree-score-display > div:first-child {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 1px;
 }
 
 .gophishfree-score-value {
-  font-size: 48px;
+  font-size: 64px;
   font-weight: bold;
   margin: 10px 0;
+  text-shadow: 0 0 30px currentColor;
 }
 
 .gophishfree-score-value.low {
-  color: #28a745;
+  color: #4ade80;
 }
 
 .gophishfree-score-value.medium {
@@ -109,53 +311,68 @@
 }
 
 .gophishfree-score-value.high {
-  color: #dc3545;
+  color: #ff6b6b;
+}
+
+.gophishfree-fish-display {
+  font-size: 48px;
+  margin: 15px 0;
+  animation: fishSwim 2s ease-in-out infinite;
 }
 
 .gophishfree-reasons {
   margin-bottom: 30px;
 }
 
-.gophishfree-reasons h3 {
-  font-size: 16px;
+.gophishfree-reasons h3,
+.gophishfree-links h3 {
+  font-size: 15px;
   margin-bottom: 15px;
-  color: #333;
+  color: #40e0d0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gophishfree-reasons h3::before {
+  content: '⚠️';
+}
+
+.gophishfree-links h3::before {
+  content: '🔗';
 }
 
 .gophishfree-reason-item {
-  padding: 10px;
-  margin-bottom: 8px;
-  background: #f8f9fa;
-  border-left: 3px solid #007bff;
-  border-radius: 4px;
-  font-size: 14px;
+  padding: 12px 16px;
+  margin-bottom: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border-left: 3px solid #40e0d0;
+  border-radius: 8px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.85);
 }
 
 .gophishfree-links {
   margin-bottom: 30px;
 }
 
-.gophishfree-links h3 {
-  font-size: 16px;
-  margin-bottom: 15px;
-  color: #333;
-}
-
 .gophishfree-link-item {
-  padding: 10px;
-  margin-bottom: 8px;
-  background: #f8f9fa;
-  border-radius: 4px;
+  padding: 12px 16px;
+  margin-bottom: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
   font-size: 12px;
   word-break: break-all;
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .gophishfree-link-item.suspicious {
-  border-left: 3px solid #dc3545;
+  border-left: 3px solid #ff6b6b;
+  background: rgba(255, 107, 107, 0.1);
 }
 
 .gophishfree-link-url {
-  color: #007bff;
+  color: #40e0d0;
   text-decoration: none;
 }
 
@@ -169,11 +386,24 @@
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0, 0, 0, 0.3);
+  background: rgba(0, 0, 0, 0.5);
   z-index: 9999;
   display: none;
+  backdrop-filter: blur(2px);
 }
 
 .gophishfree-overlay.show {
   display: block;
+}
+
+/* Water bubble decoration in sidepanel */
+.gophishfree-sidepanel::after {
+  content: '';
+  position: fixed;
+  bottom: 0;
+  right: 0;
+  width: 420px;
+  height: 100px;
+  background: linear-gradient(180deg, transparent 0%, rgba(64, 224, 208, 0.05) 100%);
+  pointer-events: none;
 }
