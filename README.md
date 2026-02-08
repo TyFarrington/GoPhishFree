@@ -71,6 +71,9 @@
 ### Class Diagram
 ![Class Diagram](Framework/class-diagram.png)
 
+### ML Model Architecture
+![ML Model Architecture](Framework/ai-model-architecture.png)
+
 ---
 
 ### Three-Tier Detection Pipeline
