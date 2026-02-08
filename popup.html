@@ -1,4 +1,19 @@
 <!DOCTYPE html>
+<!--
+  GoPhishFree – Fish Tank Dashboard (popup.html)
+
+  This is the extension popup UI shown when clicking the toolbar icon.
+  Contains:
+    • Header with Logo.png icon, title, and stat pills (with hover tooltips)
+    • Animated fish tank with SVG decorations (sand, seaweed, coral, etc.)
+    • Fish collection panel (4 types with locked/unlocked states)
+    • Recent catches list with clickable items
+    • Enhanced Scanning settings toggle
+    • Fish tooltip overlay
+
+  Styles are embedded for popup performance (single file load).
+  Fish animation logic lives in popup.js.
+-->
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -28,49 +43,73 @@
     
     /* Header */
     .header {
-      background: linear-gradient(135deg, #1e3a5f 0%, #0a1628 100%);
-      padding: 16px 20px;
       display: flex;
       justify-content: space-between;
       align-items: center;
+      padding: 16px 20px;
+      background: linear-gradient(135deg, #1e3a5f 0%, #0a1628 100%);
       border-bottom: 2px solid rgba(64, 224, 208, 0.3);
-      position: relative;
       z-index: 10;
     }
-    
+
     .header-left {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
     }
-    
-    .logo {
-      font-family: 'Fredoka One', cursive;
-      font-size: 22px;
+
+    .header-left .logo-icon img {
+      width: 36px;
+      height: 36px;
+      border-radius: 6px;
+      object-fit: cover;
+    }
+
+    .header-left .title {
+      font-size: 18px;
+      font-weight: 700;
       color: #40e0d0;
-      text-shadow: 0 0 20px rgba(64, 224, 208, 0.5);
-      letter-spacing: 1px;
-    }
-    
-    .logo-icon {
-      font-size: 28px;
-      filter: drop-shadow(0 0 10px rgba(64, 224, 208, 0.6));
+      text-shadow: 0 0 20px rgba(64, 224, 208, 0.3);
+      letter-spacing: 0.5px;
     }
     
     .stats-mini {
       display: flex;
-      gap: 12px;
+      gap: 8px;
     }
     
     .stat-mini {
       display: flex;
       align-items: center;
       gap: 4px;
-      background: rgba(255, 255, 255, 0.1);
+      background: rgba(10, 22, 40, 0.8);
+      backdrop-filter: blur(6px);
       padding: 6px 10px;
       border-radius: 20px;
       font-size: 12px;
       color: #b8d4e3;
+      cursor: default;
+      position: relative;
+    }
+
+    .stat-mini .stat-tooltip {
+      display: none;
+      position: absolute;
+      top: calc(100% + 8px);
+      right: 0;
+      background: rgba(10, 22, 40, 0.95);
+      color: #b8d4e3;
+      font-size: 11px;
+      padding: 6px 10px;
+      border-radius: 8px;
+      white-space: nowrap;
+      border: 1px solid rgba(64, 224, 208, 0.3);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+      z-index: 20;
+    }
+
+    .stat-mini:hover .stat-tooltip {
+      display: block;
     }
     
     .stat-mini .value {
@@ -78,128 +117,262 @@
       color: #40e0d0;
     }
     
-    /* Fish Tank */
+    /* ═══ Fish Tank ═══ */
     .fish-tank {
       position: relative;
       height: 300px;
       margin: 12px;
       border-radius: 20px;
-      background: linear-gradient(180deg, 
-        rgba(10, 60, 100, 0.9) 0%, 
-        rgba(15, 80, 130, 0.85) 40%,
-        rgba(20, 100, 150, 0.8) 70%,
-        rgba(194, 178, 128, 0.6) 100%
+      background: linear-gradient(180deg,
+        #062a45 0%,
+        #0a4570 25%,
+        #0e5a8a 50%,
+        #1a7aaa 72%,
+        #c2a86e 88%,
+        #a08050 100%
       );
-      border: 4px solid #2d5a7b;
-      box-shadow: 
-        inset 0 0 60px rgba(0, 100, 150, 0.4),
-        0 8px 32px rgba(0, 0, 0, 0.4),
-        0 0 0 2px rgba(64, 224, 208, 0.2);
+      border: 4px solid #2d6a8f;
+      box-shadow:
+        inset 0 0 80px rgba(0, 120, 180, 0.35),
+        inset 0 -30px 40px rgba(160, 130, 80, 0.15),
+        0 8px 32px rgba(0, 0, 0, 0.45),
+        0 0 0 2px rgba(64, 224, 208, 0.15);
       overflow: hidden;
     }
-    
-    /* Water surface effect */
+
+    /* Glass reflection highlight */
+    .fish-tank::before {
+      content: '';
+      position: absolute;
+      top: 8px;
+      left: 12px;
+      right: 60%;
+      height: 40%;
+      background: linear-gradient(165deg,
+        rgba(255, 255, 255, 0.12) 0%,
+        rgba(255, 255, 255, 0.04) 40%,
+        transparent 70%
+      );
+      border-radius: 16px 8px 50% 8px;
+      pointer-events: none;
+      z-index: 20;
+    }
+
+    /* ─── Water surface ─── */
     .water-surface {
       position: absolute;
       top: 0;
       left: 0;
       right: 0;
-      height: 8px;
-      background: linear-gradient(180deg, 
-        rgba(255, 255, 255, 0.3) 0%,
-        rgba(64, 224, 208, 0.2) 50%,
+      height: 10px;
+      background: linear-gradient(180deg,
+        rgba(200, 230, 255, 0.35) 0%,
+        rgba(64, 224, 208, 0.18) 50%,
         transparent 100%
       );
+      z-index: 15;
       animation: waveSurface 3s ease-in-out infinite;
     }
-    
+
+    /* Animated wave ripple */
+    .water-surface::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -20%;
+      width: 140%;
+      height: 6px;
+      background: repeating-linear-gradient(90deg,
+        transparent 0px,
+        rgba(255, 255, 255, 0.15) 20px,
+        transparent 40px
+      );
+      animation: waveRipple 6s linear infinite;
+    }
+
     @keyframes waveSurface {
       0%, 100% { transform: translateY(0); opacity: 0.6; }
-      50% { transform: translateY(2px); opacity: 0.8; }
+      50%      { transform: translateY(2px); opacity: 0.85; }
     }
-    
-    /* Bubbles */
+
+    @keyframes waveRipple {
+      0%   { transform: translateX(0); }
+      100% { transform: translateX(40px); }
+    }
+
+    /* ─── Bubbles ─── */
     .bubbles {
       position: absolute;
       bottom: 40px;
-      left: 20px;
-      width: 100%;
+      left: 0;
+      right: 0;
       height: 100%;
       pointer-events: none;
+      z-index: 8;
     }
-    
+
     .bubble {
       position: absolute;
       bottom: 0;
-      background: radial-gradient(circle at 30% 30%, 
-        rgba(255, 255, 255, 0.8) 0%,
-        rgba(64, 224, 208, 0.3) 50%,
+      background: radial-gradient(circle at 30% 30%,
+        rgba(255, 255, 255, 0.85) 0%,
+        rgba(64, 224, 208, 0.25) 50%,
         transparent 70%
       );
+      border: 1px solid rgba(255, 255, 255, 0.15);
       border-radius: 50%;
       animation: bubbleRise linear infinite;
     }
-    
+
     @keyframes bubbleRise {
-      0% { 
-        transform: translateY(0) scale(1); 
-        opacity: 0.7; 
-      }
-      100% { 
-        transform: translateY(-280px) scale(0.5); 
-        opacity: 0; 
-      }
+      0%   { transform: translateY(0) translateX(0) scale(1);   opacity: 0.7; }
+      25%  { transform: translateY(-70px) translateX(4px) scale(0.9);  opacity: 0.6; }
+      50%  { transform: translateY(-140px) translateX(-3px) scale(0.8); opacity: 0.5; }
+      75%  { transform: translateY(-210px) translateX(2px) scale(0.65); opacity: 0.3; }
+      100% { transform: translateY(-280px) translateX(0) scale(0.5);  opacity: 0; }
     }
-    
-    /* Sand and decorations */
+
+    /* ─── Sand floor ─── */
     .tank-floor {
       position: absolute;
       bottom: 0;
       left: 0;
       right: 0;
-      height: 40px;
-      background: linear-gradient(180deg, 
-        rgba(194, 178, 128, 0.4) 0%,
-        rgba(194, 178, 128, 0.8) 50%,
-        rgba(160, 140, 100, 0.9) 100%
-      );
+      height: 44px;
       border-radius: 0 0 16px 16px;
+      overflow: hidden;
+      z-index: 6;
     }
-    
-    .seaweed {
+
+    /* Wavy sand top edge via SVG */
+    .sand-svg {
       position: absolute;
-      bottom: 30px;
-      width: 12px;
-      background: linear-gradient(180deg, #2d8b57 0%, #1a5c3a 100%);
-      border-radius: 6px 6px 2px 2px;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* ─── Seaweed (SVG) ─── */
+    .seaweed-group {
+      position: absolute;
+      bottom: 32px;
+      z-index: 7;
+      pointer-events: none;
+    }
+
+    .seaweed-group svg {
+      display: block;
+      filter: drop-shadow(0 2px 3px rgba(0, 40, 20, 0.3));
+    }
+
+    .seaweed-blade {
       transform-origin: bottom center;
       animation: seaweedSway 4s ease-in-out infinite;
     }
-    
+
     @keyframes seaweedSway {
-      0%, 100% { transform: rotate(-5deg); }
-      50% { transform: rotate(5deg); }
+      0%, 100% { transform: rotate(-6deg) scaleX(0.95); }
+      50%      { transform: rotate(6deg) scaleX(1.05); }
     }
-    
-    .coral {
+
+    /* ─── SVG Coral ─── */
+    .coral-deco {
       position: absolute;
-      bottom: 30px;
-      font-size: 30px;
-      filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+      bottom: 32px;
+      z-index: 7;
+      pointer-events: none;
     }
-    
+
+    .coral-deco svg {
+      display: block;
+      filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.25));
+    }
+
+    /* ─── Treasure chest (SVG) ─── */
     .treasure-chest {
       position: absolute;
       bottom: 32px;
-      right: 30px;
-      font-size: 28px;
-      filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.4));
-      animation: chestGlow 2s ease-in-out infinite;
+      right: 25px;
+      z-index: 7;
+      pointer-events: none;
+      animation: chestGlow 3s ease-in-out infinite;
     }
-    
+
+    .treasure-chest svg {
+      display: block;
+      filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.4));
+    }
+
     @keyframes chestGlow {
-      0%, 100% { filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.4)); }
-      50% { filter: drop-shadow(0 2px 15px rgba(255, 215, 0, 0.6)); }
+      0%, 100% { filter: drop-shadow(0 2px 6px rgba(255, 215, 0, 0.15)); }
+      50%      { filter: drop-shadow(0 2px 18px rgba(255, 215, 0, 0.55)); }
+    }
+
+    /* ─── Pebbles / rocks ─── */
+    .pebbles {
+      position: absolute;
+      bottom: 28px;
+      left: 0;
+      right: 0;
+      z-index: 7;
+      pointer-events: none;
+    }
+
+    /* ─── Starfish ─── */
+    .starfish {
+      position: absolute;
+      z-index: 7;
+      pointer-events: none;
+    }
+
+    .starfish svg {
+      display: block;
+      filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+    }
+
+    /* ─── Caustic light overlay ─── */
+    .caustics {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 50px;
+      pointer-events: none;
+      z-index: 2;
+      opacity: 0.07;
+      background:
+        radial-gradient(ellipse 80px 60px at 25% 35%, rgba(255,255,255,0.9), transparent),
+        radial-gradient(ellipse 60px 80px at 60% 20%, rgba(255,255,255,0.8), transparent),
+        radial-gradient(ellipse 100px 50px at 80% 55%, rgba(255,255,255,0.7), transparent),
+        radial-gradient(ellipse 50px 70px at 40% 65%, rgba(255,255,255,0.6), transparent);
+      animation: causticsShift 12s ease-in-out infinite alternate;
+    }
+
+    @keyframes causticsShift {
+      0%   { transform: translateX(0) translateY(0) scale(1); }
+      33%  { transform: translateX(8px) translateY(-5px) scale(1.05); }
+      66%  { transform: translateX(-6px) translateY(4px) scale(0.97); }
+      100% { transform: translateX(3px) translateY(-3px) scale(1.02); }
+    }
+
+    /* ─── Floating particles (dust / plankton) ─── */
+    .particle {
+      position: absolute;
+      width: 2px;
+      height: 2px;
+      background: rgba(200, 230, 255, 0.5);
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 3;
+      animation: particleFloat linear infinite;
+    }
+
+    @keyframes particleFloat {
+      0%   { transform: translateY(0) translateX(0); opacity: 0; }
+      10%  { opacity: 0.6; }
+      90%  { opacity: 0.4; }
+      100% { transform: translateY(-200px) translateX(30px); opacity: 0; }
     }
     
     /* Fish container */
@@ -212,64 +385,97 @@
       overflow: hidden;
     }
     
-    /* Swimming fish */
-    .fish {
+    /* ─── SVG Fish Entity ─── */
+    .fish-entity {
       position: absolute;
-      font-size: 32px;
       cursor: pointer;
-      transition: transform 0.1s;
-      filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
       z-index: 5;
+      overflow: visible;
+      will-change: transform, left, top;
     }
-    
-    .fish:hover {
-      transform: scale(1.2);
-      filter: drop-shadow(0 4px 12px rgba(64, 224, 208, 0.6));
+
+    .fish-entity:hover {
+      filter: drop-shadow(0 0 8px rgba(64, 224, 208, 0.6)) brightness(1.1);
     }
-    
-    .fish.swimming-right {
-      animation: swimRight linear infinite;
+
+    .fish-svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+      overflow: visible;
     }
-    
-    .fish.swimming-left {
-      animation: swimLeft linear infinite;
-      transform: scaleX(-1);
+
+    /* ─── Tail flutter ─── */
+    .fish-tail {
+      transform-box: fill-box;
+      transform-origin: 100% 50%;
+      animation: tailFlutter 0.35s ease-in-out infinite alternate;
     }
-    
-    @keyframes swimRight {
-      0% { 
-        transform: translateX(-50px) translateY(0); 
-      }
-      25% { 
-        transform: translateX(calc(25% - 50px)) translateY(-10px); 
-      }
-      50% { 
-        transform: translateX(calc(50% - 50px)) translateY(5px); 
-      }
-      75% { 
-        transform: translateX(calc(75% - 50px)) translateY(-5px); 
-      }
-      100% { 
-        transform: translateX(calc(100% + 50px)) translateY(0); 
-      }
+
+    .fish-entity[data-type="suspicious"] .fish-tail { animation-duration: 0.3s; }
+    .fish-entity[data-type="phishy"] .fish-tail     { animation-duration: 0.5s; }
+    .fish-entity[data-type="shark"] .fish-tail       { animation-duration: 0.22s; }
+
+    @keyframes tailFlutter {
+      0%   { transform: rotate(-12deg) scaleX(0.92); }
+      100% { transform: rotate(12deg) scaleX(1.08); }
     }
-    
-    @keyframes swimLeft {
-      0% { 
-        transform: scaleX(-1) translateX(-50px) translateY(0); 
-      }
-      25% { 
-        transform: scaleX(-1) translateX(calc(25% - 50px)) translateY(8px); 
-      }
-      50% { 
-        transform: scaleX(-1) translateX(calc(50% - 50px)) translateY(-8px); 
-      }
-      75% { 
-        transform: scaleX(-1) translateX(calc(75% - 50px)) translateY(5px); 
-      }
-      100% { 
-        transform: scaleX(-1) translateX(calc(100% + 50px)) translateY(0); 
-      }
+
+    /* ─── Pectoral fin wave ─── */
+    .fish-pectoral {
+      transform-box: fill-box;
+      transform-origin: 80% 0%;
+      animation: finWave 1.2s ease-in-out infinite alternate;
+    }
+
+    @keyframes finWave {
+      0%   { transform: rotate(0deg); }
+      100% { transform: rotate(18deg); }
+    }
+
+    /* ─── Eye blink ─── */
+    .fish-eyelid {
+      transform-box: fill-box;
+      transform-origin: center center;
+      animation: eyeBlink 5s ease-in-out infinite;
+    }
+
+    @keyframes eyeBlink {
+      0%, 90%, 100% { transform: scaleY(0); }
+      93%, 97%      { transform: scaleY(1); }
+    }
+
+    /* Stagger blink per fish so they don't all blink at once */
+    .fish-entity:nth-child(2n) .fish-eyelid { animation-delay: -2.3s; }
+    .fish-entity:nth-child(3n) .fish-eyelid { animation-delay: -1.1s; }
+    .fish-entity:nth-child(5n) .fish-eyelid { animation-delay: -3.7s; }
+
+    /* ─── Pufferfish puff / depuff ─── */
+    .puffer-body-group {
+      transform-box: fill-box;
+      transform-origin: center center;
+      transition: transform 0.6s ease-out;
+    }
+
+    .fish-entity.puffed .puffer-body-group {
+      transform: scale(1.25);
+      transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .puffer-spines {
+      opacity: 0;
+      transition: opacity 0.3s ease-out;
+    }
+
+    .fish-entity.puffed .puffer-spines {
+      opacity: 1;
+      transition: opacity 0.15s ease-in 0.1s;
+    }
+
+    /* Keep eyes open (no blink) while puffed — startled look */
+    .fish-entity.puffed .fish-eyelid {
+      animation-play-state: paused;
+      transform: scaleY(0) !important;
     }
     
     /* Empty tank state */
@@ -366,8 +572,18 @@
     }
     
     .fish-type-icon {
-      font-size: 24px;
+      width: 40px;
+      height: 28px;
       margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .fish-type-icon .fish-svg {
+      width: 100%;
+      height: 100%;
+      overflow: visible;
     }
     
     .fish-type-count {
@@ -507,19 +723,37 @@
     /* Light rays effect */
     .light-rays {
       position: absolute;
-      top: 0;
-      left: 50%;
-      width: 200%;
-      height: 100%;
-      transform: translateX(-50%);
-      background: repeating-linear-gradient(
-        105deg,
-        transparent 0px,
-        transparent 40px,
-        rgba(255, 255, 255, 0.02) 40px,
-        rgba(255, 255, 255, 0.02) 80px
-      );
+      top: -20%;
+      left: 10%;
+      width: 120%;
+      height: 140%;
+      background:
+        linear-gradient(115deg,
+          transparent 30%,
+          rgba(255, 255, 255, 0.035) 32%,
+          rgba(255, 255, 255, 0.035) 34%,
+          transparent 36%
+        ),
+        linear-gradient(105deg,
+          transparent 42%,
+          rgba(255, 255, 255, 0.025) 44%,
+          rgba(255, 255, 255, 0.025) 47%,
+          transparent 49%
+        ),
+        linear-gradient(118deg,
+          transparent 55%,
+          rgba(255, 255, 255, 0.03) 57%,
+          rgba(255, 255, 255, 0.03) 59%,
+          transparent 61%
+        ),
+        linear-gradient(108deg,
+          transparent 68%,
+          rgba(255, 255, 255, 0.02) 70%,
+          rgba(255, 255, 255, 0.02) 73%,
+          transparent 75%
+        );
       pointer-events: none;
+      z-index: 1;
       animation: rayShift 20s linear infinite;
     }
     
@@ -528,6 +762,102 @@
       100% { transform: translateX(-50%) translateY(10%); }
     }
     
+    /* Settings panel */
+    .settings-panel {
+      margin: 12px 12px 0;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 16px;
+      border: 1px solid rgba(64, 224, 208, 0.2);
+      overflow: hidden;
+    }
+
+    .settings-header {
+      padding: 10px 16px;
+      background: rgba(0, 0, 0, 0.2);
+      border-bottom: 1px solid rgba(64, 224, 208, 0.15);
+    }
+
+    .settings-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #b8d4e3;
+    }
+
+    .settings-body {
+      padding: 10px 16px;
+    }
+
+    .setting-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      gap: 12px;
+    }
+
+    .setting-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .setting-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    .setting-desc {
+      font-size: 10px;
+      color: rgba(255, 255, 255, 0.45);
+    }
+
+    /* Toggle switch */
+    .toggle-wrapper {
+      position: relative;
+      width: 40px;
+      height: 22px;
+      flex-shrink: 0;
+    }
+
+    .toggle-wrapper input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+      position: absolute;
+    }
+
+    .toggle-slider {
+      position: absolute;
+      inset: 0;
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 22px;
+      transition: background 0.25s;
+      cursor: pointer;
+    }
+
+    .toggle-slider::after {
+      content: '';
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 16px;
+      height: 16px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform 0.25s;
+    }
+
+    .toggle-wrapper input:checked + .toggle-slider {
+      background: #40e0d0;
+    }
+
+    .toggle-wrapper input:checked + .toggle-slider::after {
+      transform: translateX(18px);
+    }
+
     /* Scrollbar styling */
     ::-webkit-scrollbar {
       width: 6px;
@@ -552,30 +882,12 @@
       background: #0a1628;
     }
     
-    /* New fish animation */
-    @keyframes newFishSplash {
-      0% { 
-        transform: scale(0) translateY(50px);
-        opacity: 0;
-      }
-      50% {
-        transform: scale(1.3) translateY(-10px);
-        opacity: 1;
-      }
-      100% {
-        transform: scale(1) translateY(0);
-        opacity: 1;
-      }
-    }
-    
-    .fish.new-catch {
-      animation: newFishSplash 0.6s ease-out forwards;
-    }
+    /* (new-catch animation removed — SVG fish use JS-driven entrance) */
     
     /* Tooltip */
     .fish-tooltip {
-      position: absolute;
-      background: rgba(0, 0, 0, 0.85);
+      position: fixed;
+      background: rgba(0, 0, 0, 0.9);
       color: #fff;
       padding: 8px 12px;
       border-radius: 8px;
@@ -586,6 +898,9 @@
       transition: opacity 0.2s;
       white-space: nowrap;
       border: 1px solid rgba(64, 224, 208, 0.3);
+      max-width: 200px;
+      white-space: normal;
+      text-align: center;
     }
     
     .fish-tooltip.show {
@@ -606,26 +921,33 @@
 <body>
   <div class="header">
     <div class="header-left">
-      <span class="logo-icon">🐟</span>
-      <span class="logo">GoPhishFree</span>
+      <span class="logo-icon"><img src="Assets/Logo.png" alt="GoPhishFree"></span>
+      <span class="title">GoPhishFree</span>
     </div>
     <div class="stats-mini">
       <div class="stat-mini">
         <span>📧</span>
         <span class="value" id="total-scanned">0</span>
+        <span class="stat-tooltip">Emails Scanned</span>
       </div>
       <div class="stat-mini">
         <span>🎣</span>
         <span class="value" id="fish-caught">0</span>
+        <span class="stat-tooltip">Fish Caught</span>
       </div>
     </div>
   </div>
   
   <div class="fish-tank" id="fish-tank">
+    <!-- Caustic light pattern -->
+    <div class="caustics"></div>
     <div class="light-rays"></div>
     <div class="water-surface"></div>
     <div class="bubbles" id="bubbles"></div>
-    
+
+    <!-- Floating particles container -->
+    <div id="particles"></div>
+
     <div class="fish-container" id="fish-container">
       <div class="empty-tank" id="empty-tank">
         <div class="empty-tank-icon">🐠</div>
@@ -633,17 +955,171 @@
         <div class="empty-tank-subtext">Scan emails in Gmail to catch phish</div>
       </div>
     </div>
-    
-    <!-- Decorations -->
-    <div class="tank-floor"></div>
-    <div class="seaweed" style="left: 25px; height: 50px;"></div>
-    <div class="seaweed" style="left: 40px; height: 70px; animation-delay: -1s;"></div>
-    <div class="seaweed" style="left: 55px; height: 45px; animation-delay: -2s;"></div>
-    <div class="seaweed" style="right: 80px; height: 60px; animation-delay: -0.5s;"></div>
-    <div class="seaweed" style="right: 95px; height: 40px; animation-delay: -1.5s;"></div>
-    <div class="coral" style="left: 80px;">🪸</div>
-    <div class="coral" style="right: 120px;">🪸</div>
-    <div class="treasure-chest">📦</div>
+
+    <!-- ═══ SVG Sand Floor ═══ -->
+    <div class="tank-floor">
+      <svg class="sand-svg" viewBox="0 0 400 48" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+        <!-- Wavy sand surface -->
+        <path d="M0,12 Q20,6 50,10 T100,8 T150,12 T200,9 T250,11 T300,8 T350,10 T400,12 L400,48 L0,48 Z"
+              fill="#c2a468"/>
+        <path d="M0,16 Q30,11 60,14 T120,12 T180,15 T240,11 T300,14 T360,12 T400,16 L400,48 L0,48 Z"
+              fill="#b89858"/>
+        <path d="M0,22 Q25,18 55,20 T110,19 T170,22 T230,18 T290,21 T350,19 T400,22 L400,48 L0,48 Z"
+              fill="#a88a4a"/>
+        <!-- Sand speckles -->
+        <circle cx="40" cy="28" r="1" fill="#d4bc82" opacity="0.5"/>
+        <circle cx="95" cy="32" r="0.8" fill="#d4bc82" opacity="0.4"/>
+        <circle cx="160" cy="26" r="1.2" fill="#d4bc82" opacity="0.5"/>
+        <circle cx="220" cy="34" r="0.7" fill="#d4bc82" opacity="0.4"/>
+        <circle cx="280" cy="29" r="1" fill="#d4bc82" opacity="0.45"/>
+        <circle cx="340" cy="31" r="0.9" fill="#d4bc82" opacity="0.5"/>
+        <circle cx="70" cy="36" r="0.6" fill="#8a7040" opacity="0.3"/>
+        <circle cx="190" cy="38" r="0.8" fill="#8a7040" opacity="0.3"/>
+        <circle cx="310" cy="35" r="0.7" fill="#8a7040" opacity="0.3"/>
+      </svg>
+    </div>
+
+    <!-- ═══ Seaweed clusters (SVG) ═══ -->
+    <!-- Left cluster -->
+    <div class="seaweed-group" style="left: 18px;">
+      <svg width="40" height="75" viewBox="0 0 40 75" xmlns="http://www.w3.org/2000/svg">
+        <path class="seaweed-blade" d="M12,75 Q8,55 14,40 Q10,28 16,15 Q14,8 18,0"
+              fill="none" stroke="#1f7a45" stroke-width="6" stroke-linecap="round"
+              style="animation-delay: 0s"/>
+        <path class="seaweed-blade" d="M22,75 Q26,58 20,42 Q24,30 18,18 Q22,10 20,2"
+              fill="none" stroke="#28915a" stroke-width="5" stroke-linecap="round"
+              style="animation-delay: -1.2s"/>
+        <path class="seaweed-blade" d="M32,75 Q28,62 34,50 Q30,40 34,30 Q30,22 32,14"
+              fill="none" stroke="#1a6b3a" stroke-width="4" stroke-linecap="round"
+              style="animation-delay: -2.4s"/>
+      </svg>
+    </div>
+
+    <!-- Right cluster -->
+    <div class="seaweed-group" style="right: 70px;">
+      <svg width="35" height="65" viewBox="0 0 35 65" xmlns="http://www.w3.org/2000/svg">
+        <path class="seaweed-blade" d="M10,65 Q14,48 8,34 Q12,22 8,12 Q12,5 10,0"
+              fill="none" stroke="#28915a" stroke-width="5" stroke-linecap="round"
+              style="animation-delay: -0.5s"/>
+        <path class="seaweed-blade" d="M22,65 Q18,50 24,38 Q20,26 24,16 Q20,8 22,2"
+              fill="none" stroke="#1f7a45" stroke-width="5" stroke-linecap="round"
+              style="animation-delay: -1.8s"/>
+      </svg>
+    </div>
+
+    <!-- Small center-right accent -->
+    <div class="seaweed-group" style="right: 140px;">
+      <svg width="14" height="40" viewBox="0 0 14 40" xmlns="http://www.w3.org/2000/svg">
+        <path class="seaweed-blade" d="M7,40 Q4,28 8,18 Q5,10 7,0"
+              fill="none" stroke="#22844e" stroke-width="4" stroke-linecap="round"
+              style="animation-delay: -3s"/>
+      </svg>
+    </div>
+
+    <!-- ═══ SVG Coral ═══ -->
+    <!-- Pink branching coral -->
+    <div class="coral-deco" style="left: 75px;">
+      <svg width="38" height="36" viewBox="0 0 38 36" xmlns="http://www.w3.org/2000/svg">
+        <path d="M19,36 L19,24 Q16,20 10,14 Q6,10 8,6 Q10,2 14,4 Q16,6 15,10"
+              fill="none" stroke="#e07088" stroke-width="3.5" stroke-linecap="round"/>
+        <path d="M19,24 Q22,18 28,14 Q32,10 30,6 Q28,2 24,4 Q22,6 23,10"
+              fill="none" stroke="#d4607a" stroke-width="3" stroke-linecap="round"/>
+        <path d="M19,28 Q17,24 12,22 Q8,20 8,16"
+              fill="none" stroke="#c85070" stroke-width="2.5" stroke-linecap="round"/>
+        <circle cx="8" cy="5" r="2.5" fill="#f0a0b0"/>
+        <circle cx="30" cy="5" r="2.5" fill="#e890a0"/>
+        <circle cx="7" cy="15" r="2" fill="#f0a0b0"/>
+      </svg>
+    </div>
+
+    <!-- Orange fan coral -->
+    <div class="coral-deco" style="right: 110px;">
+      <svg width="34" height="32" viewBox="0 0 34 32" xmlns="http://www.w3.org/2000/svg">
+        <path d="M17,32 L17,20 Q12,14 6,10 Q2,8 4,4 Q6,1 10,3"
+              fill="none" stroke="#e8854a" stroke-width="3" stroke-linecap="round"/>
+        <path d="M17,20 Q22,14 28,10 Q32,8 30,4 Q28,1 24,3"
+              fill="none" stroke="#d67540" stroke-width="3" stroke-linecap="round"/>
+        <path d="M17,22 L17,12 Q17,6 17,2"
+              fill="none" stroke="#c06530" stroke-width="2.5" stroke-linecap="round"/>
+        <circle cx="4" cy="3" r="2" fill="#f0a060"/>
+        <circle cx="30" cy="3" r="2" fill="#e89050"/>
+        <circle cx="17" cy="2" r="2" fill="#f0a060"/>
+      </svg>
+    </div>
+
+    <!-- ═══ Pebbles & rocks ═══ -->
+    <div class="pebbles">
+      <svg width="100%" height="16" viewBox="0 0 400 16" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+        <!-- Scattered pebbles -->
+        <ellipse cx="30" cy="10" rx="5" ry="3.5" fill="#8a8078" opacity="0.6"/>
+        <ellipse cx="65" cy="11" rx="4" ry="3" fill="#9a9088" opacity="0.5"/>
+        <ellipse cx="110" cy="9" rx="6" ry="3.5" fill="#7a7068" opacity="0.55"/>
+        <ellipse cx="150" cy="12" rx="3.5" ry="2.5" fill="#8a8078" opacity="0.5"/>
+        <ellipse cx="200" cy="10" rx="5" ry="3" fill="#706858" opacity="0.6"/>
+        <ellipse cx="245" cy="11" rx="4.5" ry="3" fill="#9a9088" opacity="0.45"/>
+        <ellipse cx="290" cy="9" rx="3" ry="2.5" fill="#8a8078" opacity="0.55"/>
+        <ellipse cx="330" cy="12" rx="5.5" ry="3.5" fill="#706858" opacity="0.5"/>
+        <ellipse cx="370" cy="10" rx="4" ry="2.8" fill="#9a9088" opacity="0.5"/>
+      </svg>
+    </div>
+
+    <!-- ═══ Starfish ═══ -->
+    <div class="starfish" style="bottom: 34px; left: 130px;">
+      <svg width="18" height="18" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+        <polygon points="10,0 12.4,7 20,7.6 14,12.4 15.6,20 10,15.8 4.4,20 6,12.4 0,7.6 7.6,7"
+                 fill="#e0855a" stroke="#c87048" stroke-width="0.5"/>
+        <circle cx="10" cy="9" r="1.5" fill="#c87048" opacity="0.5"/>
+      </svg>
+    </div>
+
+    <div class="starfish" style="bottom: 36px; right: 170px; transform: rotate(35deg) scale(0.7);">
+      <svg width="18" height="18" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+        <polygon points="10,0 12.4,7 20,7.6 14,12.4 15.6,20 10,15.8 4.4,20 6,12.4 0,7.6 7.6,7"
+                 fill="#d0a070" stroke="#b89060" stroke-width="0.5"/>
+        <circle cx="10" cy="9" r="1.5" fill="#b89060" opacity="0.5"/>
+      </svg>
+    </div>
+
+    <!-- ═══ SVG Treasure Chest ═══ -->
+    <div class="treasure-chest">
+      <svg width="36" height="30" viewBox="0 0 36 30" xmlns="http://www.w3.org/2000/svg">
+        <!-- Chest body -->
+        <rect x="2" y="14" width="32" height="14" rx="2" fill="#8B5E3C"/>
+        <rect x="2" y="14" width="32" height="14" rx="2" fill="url(#chestWood)" opacity="0.5"/>
+        <!-- Chest lid -->
+        <path d="M2,14 Q2,4 18,4 Q34,4 34,14 Z" fill="#A0703C"/>
+        <path d="M4,14 Q4,6 18,6 Q32,6 32,14 Z" fill="#B88040" opacity="0.5"/>
+        <!-- Metal bands -->
+        <rect x="0" y="13" width="36" height="3" rx="1" fill="#c8a84a" opacity="0.8"/>
+        <rect x="0" y="22" width="36" height="2" rx="1" fill="#c8a84a" opacity="0.5"/>
+        <!-- Lock -->
+        <rect x="14" y="11" width="8" height="8" rx="2" fill="#d4b050"/>
+        <rect x="15.5" y="12.5" width="5" height="5" rx="1.5" fill="#e8c860"/>
+        <circle cx="18" cy="15.5" r="1" fill="#8B5E3C"/>
+        <!-- Gold glow -->
+        <circle cx="18" cy="15" r="6" fill="#ffd700" opacity="0.12"/>
+        <!-- Coins peeking out -->
+        <ellipse cx="10" cy="12" rx="3" ry="1.5" fill="#e8c040" opacity="0.7"/>
+        <ellipse cx="26" cy="12" rx="2.5" ry="1.5" fill="#d4b030" opacity="0.6"/>
+        <defs>
+          <linearGradient id="chestWood" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#6a4020"/>
+            <stop offset="100%" stop-color="#8B5E3C"/>
+          </linearGradient>
+        </defs>
+      </svg>
+    </div>
+
+    <!-- ═══ Small shell decoration ═══ -->
+    <div style="position: absolute; bottom: 34px; left: 260px; z-index: 7; pointer-events: none;">
+      <svg width="14" height="12" viewBox="0 0 16 14" xmlns="http://www.w3.org/2000/svg">
+        <path d="M8,0 Q14,2 16,8 Q14,12 8,14 Q2,12 0,8 Q2,2 8,0 Z" fill="#e8d8c0" opacity="0.7"/>
+        <path d="M8,0 Q8,7 0,8" fill="none" stroke="#c0a880" stroke-width="0.5" opacity="0.5"/>
+        <path d="M8,0 Q9,7 16,8" fill="none" stroke="#c0a880" stroke-width="0.5" opacity="0.5"/>
+        <path d="M8,0 L8,14" fill="none" stroke="#c0a880" stroke-width="0.4" opacity="0.4"/>
+      </svg>
+    </div>
+
   </div>
   
   <div class="collection-panel">
@@ -655,23 +1131,23 @@
       <div class="collection-count" id="collection-count">0 / 4 types</div>
     </div>
     <div class="fish-types" id="fish-types">
-      <div class="fish-type" data-type="friendly" title="Low Risk (0-39)">
-        <span class="fish-type-icon">🐟</span>
+      <div class="fish-type" data-type="friendly" title="Low Risk (0-49)">
+        <div class="fish-type-icon" data-fish-type="friendly"></div>
         <span class="fish-type-count" id="count-friendly">0</span>
         <span class="fish-type-name">Friendly</span>
       </div>
-      <div class="fish-type" data-type="suspicious" title="Medium Risk (40-69)">
-        <span class="fish-type-icon">🐠</span>
+      <div class="fish-type" data-type="suspicious" title="Medium Risk (50-75)">
+        <div class="fish-type-icon" data-fish-type="suspicious"></div>
         <span class="fish-type-count" id="count-suspicious">0</span>
         <span class="fish-type-name">Suspicious</span>
       </div>
-      <div class="fish-type" data-type="phishy" title="High Risk (70-89)">
-        <span class="fish-type-icon">🐡</span>
+      <div class="fish-type" data-type="phishy" title="High Risk (76-89)">
+        <div class="fish-type-icon" data-fish-type="phishy"></div>
         <span class="fish-type-count" id="count-phishy">0</span>
         <span class="fish-type-name">Phishy</span>
       </div>
-      <div class="fish-type" data-type="shark" title="Dangerous (90+)">
-        <span class="fish-type-icon">🦈</span>
+      <div class="fish-type" data-type="shark" title="Dangerous (90-100)">
+        <div class="fish-type-icon" data-fish-type="shark"></div>
         <span class="fish-type-count" id="count-shark">0</span>
         <span class="fish-type-name">Mega Phish</span>
       </div>
@@ -688,6 +1164,24 @@
     </div>
   </div>
   
+  <div class="settings-panel">
+    <div class="settings-header">
+      <span class="settings-title">Settings</span>
+    </div>
+    <div class="settings-body">
+      <label class="setting-row" for="enhanced-scanning-toggle">
+        <div class="setting-info">
+          <span class="setting-label">Enhanced Scanning</span>
+          <span class="setting-desc">DNS checks via Cloudflare (only domain names sent)</span>
+        </div>
+        <div class="toggle-wrapper">
+          <input type="checkbox" id="enhanced-scanning-toggle" checked>
+          <span class="toggle-slider"></span>
+        </div>
+      </label>
+    </div>
+  </div>
+
   <div class="fish-tooltip" id="fish-tooltip">
     <div class="tooltip-title"></div>
     <div class="tooltip-detail"></div>

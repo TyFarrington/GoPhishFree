@@ -1,6 +1,16 @@
-/* GoPhishFree Content Script Styles - Fish Theme Edition */
+/* ═══════════════════════════════════════════════════════════════════
+   GoPhishFree – Content Script Styles
+   
+   Styles injected into the Gmail page for:
+     • Risk badges (low / medium / high / dangerous)
+     • Loading badges and deep-scan loading state
+     • Fish-caught celebration animation
+     • Analysis side panel (header, score, reasons, links)
+     • Deep Scan progress / results section
+     • Report Phish button and severity selection modal
+   ═══════════════════════════════════════════════════════════════════ */
 
-/* Fish Risk Badge */
+/* ──────── Risk Badge (email header pill) ──────── */
 .gophishfree-risk-badge {
   display: inline-flex;
   align-items: center;
@@ -232,12 +242,13 @@
 }
 
 .gophishfree-sidepanel-header {
-  padding: 24px;
+  position: relative;
   background: linear-gradient(135deg, #1e3a5f 0%, #0a1628 100%);
   border-bottom: 2px solid rgba(64, 224, 208, 0.3);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  overflow: hidden;
+  border-radius: 0 0 12px 12px;
+  padding: 14px 0 10px;
+  text-align: center;
 }
 
 .gophishfree-sidepanel-header h2 {
@@ -249,13 +260,31 @@
   gap: 10px;
 }
 
-.gophishfree-sidepanel-header h2::before {
-  content: '🐟';
-  font-size: 24px;
+.gophishfree-header-banner {
+  width: 60%;
+  display: block;
+  margin: 0 auto;
+  border-radius: 10px;
+}
+
+.gophishfree-header-subtitle {
+  display: block;
+  text-align: center;
+  margin: 0 0 8px 0;
+  padding-top: 4px;
+  font-size: 20px;
+  font-weight: 700;
+  color: #40e0d0;
+  text-shadow: 0 0 20px rgba(64, 224, 208, 0.5), 0 2px 8px rgba(0, 0, 0, 0.6);
+  letter-spacing: 1px;
 }
 
 .gophishfree-sidepanel-close {
-  background: rgba(255, 255, 255, 0.1);
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: rgba(10, 22, 40, 0.7);
+  backdrop-filter: blur(6px);
   border: none;
   font-size: 24px;
   cursor: pointer;
@@ -406,4 +435,382 @@
   height: 100px;
   background: linear-gradient(180deg, transparent 0%, rgba(64, 224, 208, 0.05) 100%);
   pointer-events: none;
+}
+
+/* ──────── Tier 3: Deep Scan UI ──────── */
+
+.gophishfree-deepscan-section {
+  margin-top: 30px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(64, 224, 208, 0.15);
+}
+
+/* Deep Scan Button */
+.gophishfree-deepscan-btn {
+  width: 100%;
+  padding: 14px 20px;
+  border: 2px solid rgba(64, 224, 208, 0.4);
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(64, 224, 208, 0.15) 0%, rgba(64, 224, 208, 0.05) 100%);
+  color: #40e0d0;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  transition: all 0.3s;
+  font-family: inherit;
+}
+
+.gophishfree-deepscan-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, rgba(64, 224, 208, 0.3) 0%, rgba(64, 224, 208, 0.1) 100%);
+  border-color: #40e0d0;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(64, 224, 208, 0.25);
+}
+
+.gophishfree-deepscan-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.gophishfree-deepscan-btn.scanning {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.gophishfree-deepscan-icon {
+  font-size: 20px;
+}
+
+/* Info text */
+.gophishfree-deepscan-info {
+  margin-top: 10px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.35);
+  line-height: 1.5;
+  text-align: center;
+}
+
+/* Progress / spinner */
+.gophishfree-deepscan-progress {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 12px 16px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 10px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.gophishfree-deepscan-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(64, 224, 208, 0.3);
+  border-top-color: #40e0d0;
+  border-radius: 50%;
+  animation: gpfSpin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes gpfSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* Deep Scan Result */
+.gophishfree-deepscan-result {
+  margin-top: 14px;
+}
+
+.gophishfree-deepscan-badge {
+  display: inline-block;
+  padding: 5px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  background: rgba(64, 224, 208, 0.2);
+  color: #40e0d0;
+  border: 1px solid rgba(64, 224, 208, 0.4);
+  margin-bottom: 10px;
+}
+
+.gophishfree-deepscan-findings {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 10px;
+  padding: 10px 14px;
+}
+
+.gophishfree-deepscan-finding {
+  font-size: 12px;
+  color: #ff6b6b;
+  padding: 4px 0;
+}
+
+.gophishfree-deepscan-finding.safe {
+  color: #4ade80;
+}
+
+/* ──────── Loading Badge (initial scan & deep scan) ──────── */
+
+/* Badge spinner (small inline spinner for the header pill) */
+.gophishfree-badge-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(120, 120, 120, 0.3);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: gpfBadgeSpin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes gpfBadgeSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* Loading badge during initial scan */
+.gophishfree-loading-badge {
+  background: linear-gradient(135deg, #e8edf2 0%, #dde3ea 100%);
+  color: #5a6a7a;
+  border: 2px solid #c4cdd8;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  animation: gpfLoadingPulse 1.5s ease-in-out infinite;
+  cursor: default;
+}
+
+.gophishfree-loading-badge:hover {
+  transform: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+@keyframes gpfLoadingPulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.65; }
+}
+
+/* Deep scan loading state (overlaid on existing coloured badge) */
+.gophishfree-deepscan-loading {
+  animation: gpfDeepScanPulse 1.2s ease-in-out infinite;
+  cursor: default;
+}
+
+.gophishfree-deepscan-loading:hover {
+  transform: none;
+}
+
+@keyframes gpfDeepScanPulse {
+  0%, 100% { opacity: 1;   filter: brightness(1); }
+  50%      { opacity: 0.7; filter: brightness(1.15); }
+}
+
+/* Score update animation */
+.gophishfree-score-updating {
+  animation: gpfScorePulse 0.3s ease-out;
+}
+
+@keyframes gpfScorePulse {
+  0%   { transform: scale(1);   opacity: 1; }
+  50%  { transform: scale(0.8); opacity: 0.4; }
+  100% { transform: scale(1);   opacity: 1; }
+}
+
+/* ═══════════════════════════════════════════════
+   Report Phish Button & Modal
+   ═══════════════════════════════════════════════ */
+
+/* Report section in side panel */
+.gophishfree-report-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.gophishfree-report-btn {
+  width: 100%;
+  padding: 14px 20px;
+  border: 2px solid rgba(239, 68, 68, 0.4);
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(239, 68, 68, 0.05) 100%);
+  color: #f87171;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  transition: all 0.3s;
+  font-family: inherit;
+}
+
+.gophishfree-report-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.3) 0%, rgba(239, 68, 68, 0.1) 100%);
+  border-color: #f87171;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(239, 68, 68, 0.25);
+}
+
+.gophishfree-report-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.gophishfree-report-icon {
+  font-size: 20px;
+}
+
+.gophishfree-report-info {
+  margin-top: 10px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.35);
+  line-height: 1.5;
+  text-align: center;
+}
+
+/* ── Report Modal Overlay ── */
+.gophishfree-report-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  z-index: 2147483647;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+.gophishfree-report-overlay.show {
+  opacity: 1;
+}
+
+/* ── Report Modal Card ── */
+.gophishfree-report-card {
+  background: linear-gradient(165deg, #1e293b 0%, #0f172a 100%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  padding: 28px 24px 20px;
+  width: 340px;
+  max-width: 90vw;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  transform: scale(0.9);
+  transition: transform 0.25s ease;
+}
+
+.gophishfree-report-overlay.show .gophishfree-report-card {
+  transform: scale(1);
+}
+
+.gophishfree-report-card-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #f1f5f9;
+  text-align: center;
+  margin-bottom: 6px;
+}
+
+.gophishfree-report-card-subtitle {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.5);
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+/* ── Severity Option Buttons ── */
+.gophishfree-report-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.gophishfree-report-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background: rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+  text-align: left;
+}
+
+.gophishfree-report-option:hover {
+  transform: translateX(4px);
+}
+
+.gophishfree-report-option.low {
+  border-color: rgba(74, 222, 128, 0.35);
+}
+.gophishfree-report-option.low:hover {
+  background: rgba(74, 222, 128, 0.12);
+  border-color: #4ade80;
+}
+
+.gophishfree-report-option.medium {
+  border-color: rgba(250, 204, 21, 0.35);
+}
+.gophishfree-report-option.medium:hover {
+  background: rgba(250, 204, 21, 0.12);
+  border-color: #facc15;
+}
+
+.gophishfree-report-option.high {
+  border-color: rgba(251, 146, 60, 0.35);
+}
+.gophishfree-report-option.high:hover {
+  background: rgba(251, 146, 60, 0.12);
+  border-color: #fb923c;
+}
+
+.gophishfree-report-option.dangerous {
+  border-color: rgba(248, 113, 113, 0.35);
+}
+.gophishfree-report-option.dangerous:hover {
+  background: rgba(248, 113, 113, 0.12);
+  border-color: #f87171;
+}
+
+.gophishfree-report-option-fish {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.gophishfree-report-option-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #f1f5f9;
+}
+
+.gophishfree-report-option-desc {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.45);
+  margin-left: auto;
+}
+
+/* ── Cancel Button ── */
+.gophishfree-report-cancel {
+  width: 100%;
+  margin-top: 14px;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.gophishfree-report-cancel:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.8);
 }

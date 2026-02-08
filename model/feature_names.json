@@ -6,6 +6,7 @@
   "NumDash",
   "NumDashInHostname",
   "AtSymbol",
+  "TildeSymbol",
   "NumUnderscore",
   "NumPercent",
   "NumQueryComponents",
@@ -14,9 +15,13 @@
   "NumNumericChars",
   "NoHttps",
   "IpAddress",
+  "DomainInSubdomains",
+  "DomainInPaths",
+  "HttpsInHostname",
   "HostnameLength",
   "PathLength",
   "QueryLength",
   "DoubleSlashInPath",
-  "NumSensitiveWords"
+  "NumSensitiveWords",
+  "FrequentDomainNameMismatch"
 ]
