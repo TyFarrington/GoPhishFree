@@ -59,6 +59,20 @@
 
 ## Architecture
 
+### System Architecture
+![System Architecture](Framework/system-architecture.png)
+
+### Risk Scoring Pipeline
+![Risk Scoring Pipeline](Framework/risk-scoring-pipeline.png)
+
+### Email Scan Sequence
+![Email Scan Sequence](Framework/email-scan-sequence-diagram.png)
+
+### Class Diagram
+![Class Diagram](Framework/class-diagram.png)
+
+---
+
 ### Three-Tier Detection Pipeline
 
 **Tier 1 - Email Analysis (25 ML features + 10 custom features)**
