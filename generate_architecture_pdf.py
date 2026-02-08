@@ -132,8 +132,8 @@ def build_pdf():
     # Meta table
     meta = [
         ("Course", "EECS 582 - Capstone Project"),
-        ("Team Number", "2"),
-        ("Team Members", "Ty Farrington, Mohanad Abdalla, Connor Kroll, Christian Razo"),
+        ("Team Number", "24"),
+        ("Team Members", "Ty Farrington, Brett Suhr, Andrew Reyes, Nicholas Holmes, Kaleb Howard"),
         ("Project Name", "GoPhishFree"),
         ("Date", "February 8, 2026"),
     ]
