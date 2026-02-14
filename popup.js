@@ -506,6 +506,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initBubbles();
   initParticles();
   initSettings();
+  initTrustedDomains();
 
   document.getElementById('clear-btn').addEventListener('click', clearHistory);
 
@@ -531,16 +532,181 @@ function initCollectionIcons() {
    ═══════════════════════════════════════════════ */
 
 function initSettings() {
+  // ── Enhanced Scanning toggle ──
   const toggle = document.getElementById('enhanced-scanning-toggle');
-  if (!toggle) return;
+  if (toggle) {
+    chrome.storage.local.get(['enhancedScanning'], (data) => {
+      toggle.checked = data.enhancedScanning !== false;
+    });
+    toggle.addEventListener('change', () => {
+      chrome.storage.local.set({ enhancedScanning: toggle.checked });
+    });
+  }
 
-  chrome.storage.local.get(['enhancedScanning'], (data) => {
-    toggle.checked = data.enhancedScanning !== false;
+  // ── AI Enhancement toggle + configure ──
+  const aiToggle    = document.getElementById('ai-enhance-toggle');
+  const aiConfigBtn = document.getElementById('ai-configure-btn');
+  const aiStatusPill = document.getElementById('ai-status-pill');
+
+  if (aiToggle) {
+    chrome.storage.local.get(['aiEnhanceEnabled', 'aiProvider', 'aiApiKey'], (data) => {
+      aiToggle.checked = !!data.aiEnhanceEnabled;
+      updateAiUI(data);
+    });
+
+    aiToggle.addEventListener('change', () => {
+      chrome.storage.local.set({ aiEnhanceEnabled: aiToggle.checked });
+      chrome.storage.local.get(['aiProvider', 'aiApiKey'], (data) => {
+        updateAiUI({ ...data, aiEnhanceEnabled: aiToggle.checked });
+      });
+    });
+  }
+
+  if (aiConfigBtn) {
+    aiConfigBtn.addEventListener('click', openAiModal);
+  }
+
+  function updateAiUI(data) {
+    const isEnabled = !!data.aiEnhanceEnabled;
+    const hasKey = !!(data.aiApiKey && data.aiApiKey.trim());
+
+    // Show/hide configure button
+    if (aiConfigBtn) {
+      aiConfigBtn.classList.toggle('show', isEnabled);
+    }
+
+    // Update status pill
+    if (aiStatusPill) {
+      if (!isEnabled) {
+        aiStatusPill.className = 'ai-status-pill';
+        aiStatusPill.textContent = '';
+      } else if (hasKey) {
+        aiStatusPill.className = 'ai-status-pill configured';
+        aiStatusPill.textContent = (data.aiProvider || 'openai').toUpperCase();
+      } else {
+        aiStatusPill.className = 'ai-status-pill not-configured';
+        aiStatusPill.textContent = 'Not configured';
+      }
+    }
+  }
+
+  // ── AI Configuration Modal ──
+  initAiModal();
+}
+
+function initAiModal() {
+  const overlay       = document.getElementById('ai-modal-overlay');
+  const closeBtn      = document.getElementById('ai-modal-close');
+  const cancelBtn     = document.getElementById('ai-modal-cancel');
+  const saveBtn       = document.getElementById('ai-modal-save');
+  const providerSel   = document.getElementById('ai-provider-select');
+  const endpointField = document.getElementById('ai-endpoint-field');
+  const modelField    = document.getElementById('ai-model-field');
+
+  if (!overlay) return;
+
+  // Show/hide custom endpoint fields based on provider
+  if (providerSel) {
+    providerSel.addEventListener('change', () => {
+      const val = providerSel.value;
+      const showCustom = val === 'custom' || val === 'azure';
+      if (endpointField) endpointField.classList.toggle('show', showCustom);
+      if (modelField) modelField.classList.toggle('show', showCustom);
+    });
+  }
+
+  // Close handlers
+  if (closeBtn) closeBtn.addEventListener('click', closeAiModal);
+  if (cancelBtn) cancelBtn.addEventListener('click', closeAiModal);
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) closeAiModal();
   });
 
-  toggle.addEventListener('change', () => {
-    chrome.storage.local.set({ enhancedScanning: toggle.checked });
+  // Save handler
+  if (saveBtn) {
+    saveBtn.addEventListener('click', () => {
+      const provider    = document.getElementById('ai-provider-select').value;
+      const apiKey      = document.getElementById('ai-api-key').value.trim();
+      const endpointUrl = document.getElementById('ai-endpoint-url').value.trim();
+      const modelName   = document.getElementById('ai-model-name').value.trim();
+      const testResult  = document.getElementById('ai-test-result');
+
+      if (!apiKey) {
+        if (testResult) {
+          testResult.className = 'ai-test-result error';
+          testResult.textContent = 'API key is required.';
+        }
+        return;
+      }
+
+      if ((provider === 'custom' || provider === 'azure') && !endpointUrl) {
+        if (testResult) {
+          testResult.className = 'ai-test-result error';
+          testResult.textContent = 'Endpoint URL is required for this provider.';
+        }
+        return;
+      }
+
+      // Save to local storage (NEVER sync)
+      chrome.storage.local.set({
+        aiProvider: provider,
+        aiApiKey: apiKey,
+        aiEndpointUrl: endpointUrl,
+        aiModelName: modelName,
+        aiEnhanceEnabled: true
+      }, () => {
+        if (testResult) {
+          testResult.className = 'ai-test-result success';
+          testResult.textContent = 'Configuration saved. AI enhancement is now active.';
+        }
+
+        // Update toggle and status
+        const aiToggle = document.getElementById('ai-enhance-toggle');
+        if (aiToggle) aiToggle.checked = true;
+        const pill = document.getElementById('ai-status-pill');
+        if (pill) {
+          pill.className = 'ai-status-pill configured';
+          pill.textContent = provider.toUpperCase();
+        }
+
+        // Close after brief delay
+        setTimeout(closeAiModal, 1200);
+      });
+    });
+  }
+}
+
+function openAiModal() {
+  const overlay = document.getElementById('ai-modal-overlay');
+  if (!overlay) return;
+
+  // Load current settings into the modal
+  chrome.storage.local.get(['aiProvider', 'aiApiKey', 'aiEndpointUrl', 'aiModelName'], (data) => {
+    const providerSel = document.getElementById('ai-provider-select');
+    const apiKeyInput = document.getElementById('ai-api-key');
+    const endpointInput = document.getElementById('ai-endpoint-url');
+    const modelInput = document.getElementById('ai-model-name');
+    const endpointField = document.getElementById('ai-endpoint-field');
+    const modelField = document.getElementById('ai-model-field');
+    const testResult = document.getElementById('ai-test-result');
+
+    if (providerSel) providerSel.value = data.aiProvider || 'openai';
+    if (apiKeyInput) apiKeyInput.value = data.aiApiKey || '';
+    if (endpointInput) endpointInput.value = data.aiEndpointUrl || '';
+    if (modelInput) modelInput.value = data.aiModelName || '';
+    if (testResult) { testResult.className = 'ai-test-result'; testResult.textContent = ''; }
+
+    const showCustom = (data.aiProvider === 'custom' || data.aiProvider === 'azure');
+    if (endpointField) endpointField.classList.toggle('show', showCustom);
+    if (modelField) modelField.classList.toggle('show', showCustom);
   });
+
+  overlay.classList.add('show');
+}
+
+function closeAiModal() {
+  const overlay = document.getElementById('ai-modal-overlay');
+  if (overlay) overlay.classList.remove('show');
 }
 
 /* ═══════════════════════════════════════════════
@@ -831,3 +997,208 @@ function shuffleArray(array) {
   }
   return a;
 }
+
+/* ═══════════════════════════════════════════════
+   Trusted Domains Manager
+   ═══════════════════════════════════════════════ */
+
+function initTrustedDomains() {
+  const input     = document.getElementById('td-input');
+  const trustBtn  = document.getElementById('td-trust-btn');
+  const blockBtn  = document.getElementById('td-block-btn');
+  const listEl    = document.getElementById('td-list');
+  const emptyEl   = document.getElementById('td-empty');
+  const countEl   = document.getElementById('td-count');
+
+  if (!input || !trustBtn || !blockBtn) return;
+
+  /**
+   * Validate and normalize a domain string.
+   * Returns lowercase trimmed domain or null if invalid.
+   */
+  function normalizeDomain(raw) {
+    let d = (raw || '').toLowerCase().trim();
+    // Strip leading http(s)://
+    d = d.replace(/^https?:\/\//, '');
+    // Strip trailing slashes/paths
+    d = d.split('/')[0];
+    // Strip leading www.
+    d = d.replace(/^www\./, '');
+    // Basic validation: must have at least one dot and no spaces
+    if (!d || !d.includes('.') || d.includes(' ')) return null;
+    // Must be a valid-looking domain
+    if (!/^[a-z0-9][a-z0-9.-]*[a-z0-9]\.[a-z]{2,}$/.test(d) && !/^[a-z0-9]+\.[a-z]{2,}$/.test(d)) {
+      return null;
+    }
+    return d;
+  }
+
+  /**
+   * Render the chip list from storage data.
+   */
+  function renderList(trusted, blocked) {
+    listEl.innerHTML = '';
+
+    const hasTrusted = trusted && trusted.length > 0;
+    const hasBlocked = blocked && blocked.length > 0;
+
+    if (!hasTrusted && !hasBlocked) {
+      if (emptyEl) {
+        emptyEl.style.display = '';
+        listEl.appendChild(emptyEl);
+      }
+    } else {
+      if (emptyEl) emptyEl.style.display = 'none';
+
+      (trusted || []).forEach(domain => {
+        const chip = document.createElement('span');
+        chip.className = 'td-chip trusted';
+        chip.innerHTML = `${escapeHtml(domain)} <span class="td-remove" data-domain="${escapeHtml(domain)}" data-type="trusted">&times;</span>`;
+        listEl.appendChild(chip);
+      });
+
+      (blocked || []).forEach(domain => {
+        const chip = document.createElement('span');
+        chip.className = 'td-chip blocked';
+        chip.innerHTML = `${escapeHtml(domain)} <span class="td-remove" data-domain="${escapeHtml(domain)}" data-type="blocked">&times;</span>`;
+        listEl.appendChild(chip);
+      });
+    }
+
+    // Update count
+    const nTrusted = (trusted || []).length;
+    const nBlocked = (blocked || []).length;
+    let countText = '500+ built-in';
+    if (nTrusted > 0 || nBlocked > 0) {
+      const parts = ['500+ built-in'];
+      if (nTrusted > 0) parts.push(`+${nTrusted} custom`);
+      if (nBlocked > 0) parts.push(`${nBlocked} blocked`);
+      countText = parts.join(', ');
+    }
+    if (countEl) countEl.textContent = countText;
+  }
+
+  /**
+   * Load and render.
+   */
+  function loadAndRender() {
+    chrome.storage.local.get(['customTrustedDomains', 'customBlockedDomains'], (result) => {
+      renderList(result.customTrustedDomains || [], result.customBlockedDomains || []);
+    });
+  }
+
+  /**
+   * Add a domain to trusted list.
+   */
+  function addTrusted() {
+    const domain = normalizeDomain(input.value);
+    if (!domain) {
+      input.style.borderColor = 'rgba(231, 76, 60, 0.6)';
+      setTimeout(() => { input.style.borderColor = ''; }, 1500);
+      return;
+    }
+
+    chrome.storage.local.get(['customTrustedDomains', 'customBlockedDomains'], (result) => {
+      const trusted = result.customTrustedDomains || [];
+      const blocked = result.customBlockedDomains || [];
+
+      // Remove from blocked if it was there
+      const blockedIdx = blocked.indexOf(domain);
+      if (blockedIdx !== -1) blocked.splice(blockedIdx, 1);
+
+      // Add to trusted if not already there
+      if (!trusted.includes(domain)) {
+        trusted.push(domain);
+      }
+
+      chrome.storage.local.set({
+        customTrustedDomains: trusted,
+        customBlockedDomains: blocked
+      }, () => {
+        input.value = '';
+        renderList(trusted, blocked);
+      });
+    });
+  }
+
+  /**
+   * Add a domain to blocked list (removes it from built-in trusted behavior).
+   */
+  function addBlocked() {
+    const domain = normalizeDomain(input.value);
+    if (!domain) {
+      input.style.borderColor = 'rgba(231, 76, 60, 0.6)';
+      setTimeout(() => { input.style.borderColor = ''; }, 1500);
+      return;
+    }
+
+    chrome.storage.local.get(['customTrustedDomains', 'customBlockedDomains'], (result) => {
+      const trusted = result.customTrustedDomains || [];
+      const blocked = result.customBlockedDomains || [];
+
+      // Remove from trusted if it was there
+      const trustedIdx = trusted.indexOf(domain);
+      if (trustedIdx !== -1) trusted.splice(trustedIdx, 1);
+
+      // Add to blocked if not already there
+      if (!blocked.includes(domain)) {
+        blocked.push(domain);
+      }
+
+      chrome.storage.local.set({
+        customTrustedDomains: trusted,
+        customBlockedDomains: blocked
+      }, () => {
+        input.value = '';
+        renderList(trusted, blocked);
+      });
+    });
+  }
+
+  /**
+   * Remove a domain from either list.
+   */
+  function removeDomain(domain, type) {
+    chrome.storage.local.get(['customTrustedDomains', 'customBlockedDomains'], (result) => {
+      const trusted = result.customTrustedDomains || [];
+      const blocked = result.customBlockedDomains || [];
+
+      if (type === 'trusted') {
+        const idx = trusted.indexOf(domain);
+        if (idx !== -1) trusted.splice(idx, 1);
+      } else {
+        const idx = blocked.indexOf(domain);
+        if (idx !== -1) blocked.splice(idx, 1);
+      }
+
+      chrome.storage.local.set({
+        customTrustedDomains: trusted,
+        customBlockedDomains: blocked
+      }, () => {
+        renderList(trusted, blocked);
+      });
+    });
+  }
+
+  // Event listeners
+  trustBtn.addEventListener('click', addTrusted);
+  blockBtn.addEventListener('click', addBlocked);
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addTrusted();
+    }
+  });
+
+  listEl.addEventListener('click', (e) => {
+    const removeBtn = e.target.closest('.td-remove');
+    if (removeBtn) {
+      removeDomain(removeBtn.dataset.domain, removeBtn.dataset.type);
+    }
+  });
+
+  // Initial load
+  loadAndRender();
+}
+

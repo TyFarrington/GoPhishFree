@@ -4,7 +4,7 @@
 
   This is the extension popup UI shown when clicking the toolbar icon.
   Contains:
-    • Header with Logo.png icon, title, and stat pills (with hover tooltips)
+    • Header with logomini.png icon, title, and stat pills (with hover tooltips)
     • Animated fish tank with SVG decorations (sand, seaweed, coral, etc.)
     • Fish collection panel (4 types with locked/unlocked states)
     • Recent catches list with clickable items
@@ -858,6 +858,364 @@
       transform: translateX(18px);
     }
 
+    /* ═══ AI Enhancement Settings ═══ */
+    .setting-row + .setting-row {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .ai-configure-btn {
+      margin-top: 8px;
+      width: 100%;
+      padding: 8px 12px;
+      background: rgba(64, 224, 208, 0.12);
+      border: 1px solid rgba(64, 224, 208, 0.25);
+      border-radius: 10px;
+      color: #40e0d0;
+      font-family: 'Quicksand', sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: none;
+    }
+
+    .ai-configure-btn:hover {
+      background: rgba(64, 224, 208, 0.2);
+      border-color: rgba(64, 224, 208, 0.4);
+    }
+
+    .ai-configure-btn.show {
+      display: block;
+    }
+
+    .ai-status-pill {
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-weight: 600;
+      display: none;
+    }
+
+    .ai-status-pill.configured {
+      display: inline;
+      background: rgba(64, 224, 208, 0.2);
+      color: #40e0d0;
+    }
+
+    .ai-status-pill.not-configured {
+      display: inline;
+      background: rgba(255, 193, 7, 0.2);
+      color: #ffc107;
+    }
+
+    /* ═══ Trusted Domains Manager ═══ */
+    .trusted-domains-section {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .trusted-domains-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+
+    .trusted-domains-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: #b8d4e3;
+    }
+
+    .trusted-domains-count {
+      font-size: 10px;
+      color: rgba(255,255,255,0.4);
+      font-weight: 500;
+    }
+
+    .trusted-domains-add-row {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+
+    .trusted-domains-add-row input {
+      flex: 1;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 8px;
+      padding: 6px 10px;
+      color: #e0e0e0;
+      font-size: 11px;
+      font-family: 'Quicksand', sans-serif;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .trusted-domains-add-row input:focus {
+      border-color: rgba(64, 224, 208, 0.4);
+    }
+
+    .trusted-domains-add-row input::placeholder {
+      color: rgba(255,255,255,0.25);
+    }
+
+    .td-add-btn, .td-block-btn {
+      padding: 6px 10px;
+      border-radius: 8px;
+      font-size: 10px;
+      font-weight: 700;
+      font-family: 'Quicksand', sans-serif;
+      cursor: pointer;
+      border: 1px solid;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+
+    .td-add-btn {
+      background: rgba(46, 204, 113, 0.15);
+      border-color: rgba(46, 204, 113, 0.3);
+      color: #2ecc71;
+    }
+
+    .td-add-btn:hover {
+      background: rgba(46, 204, 113, 0.25);
+    }
+
+    .td-block-btn {
+      background: rgba(231, 76, 60, 0.15);
+      border-color: rgba(231, 76, 60, 0.3);
+      color: #e74c3c;
+    }
+
+    .td-block-btn:hover {
+      background: rgba(231, 76, 60, 0.25);
+    }
+
+    .td-list {
+      max-height: 120px;
+      overflow-y: auto;
+      margin-top: 6px;
+    }
+
+    .td-list::-webkit-scrollbar { width: 4px; }
+    .td-list::-webkit-scrollbar-track { background: transparent; }
+    .td-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
+
+    .td-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 8px;
+      margin: 2px 3px 2px 0;
+      border-radius: 12px;
+      font-size: 10px;
+      font-weight: 600;
+      font-family: 'Quicksand', sans-serif;
+    }
+
+    .td-chip.trusted {
+      background: rgba(46, 204, 113, 0.15);
+      color: #2ecc71;
+      border: 1px solid rgba(46, 204, 113, 0.25);
+    }
+
+    .td-chip.blocked {
+      background: rgba(231, 76, 60, 0.15);
+      color: #e74c3c;
+      border: 1px solid rgba(231, 76, 60, 0.25);
+    }
+
+    .td-chip .td-remove {
+      cursor: pointer;
+      font-size: 12px;
+      line-height: 1;
+      opacity: 0.6;
+      transition: opacity 0.15s;
+    }
+
+    .td-chip .td-remove:hover {
+      opacity: 1;
+    }
+
+    .td-empty {
+      font-size: 10px;
+      color: rgba(255,255,255,0.3);
+      font-style: italic;
+      padding: 4px 0;
+    }
+
+    /* ═══ AI Configure Modal ═══ */
+    .ai-modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 200;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(4px);
+    }
+
+    .ai-modal-overlay.show {
+      display: flex;
+    }
+
+    .ai-modal {
+      background: linear-gradient(180deg, #0d2847 0%, #0a1628 100%);
+      border: 1px solid rgba(64, 224, 208, 0.3);
+      border-radius: 16px;
+      width: 380px;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+    }
+
+    .ai-modal-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid rgba(64, 224, 208, 0.15);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .ai-modal-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: #40e0d0;
+    }
+
+    .ai-modal-close {
+      background: none;
+      border: none;
+      color: rgba(255, 255, 255, 0.5);
+      font-size: 20px;
+      cursor: pointer;
+      padding: 0 4px;
+      line-height: 1;
+    }
+
+    .ai-modal-close:hover {
+      color: #fff;
+    }
+
+    .ai-modal-body {
+      padding: 16px 20px;
+    }
+
+    .ai-field {
+      margin-bottom: 14px;
+    }
+
+    .ai-field-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #b8d4e3;
+      margin-bottom: 6px;
+      display: block;
+    }
+
+    .ai-field select,
+    .ai-field input {
+      width: 100%;
+      padding: 10px 12px;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 10px;
+      color: #fff;
+      font-family: 'Quicksand', sans-serif;
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .ai-field select:focus,
+    .ai-field input:focus {
+      border-color: rgba(64, 224, 208, 0.5);
+    }
+
+    .ai-field select option {
+      background: #0a1628;
+      color: #fff;
+    }
+
+    .ai-field-hint {
+      font-size: 10px;
+      color: rgba(255, 255, 255, 0.35);
+      margin-top: 4px;
+    }
+
+    .ai-field-endpoint {
+      display: none;
+    }
+
+    .ai-field-endpoint.show {
+      display: block;
+    }
+
+    .ai-modal-footer {
+      padding: 12px 20px 16px;
+      display: flex;
+      gap: 10px;
+    }
+
+    .ai-save-btn,
+    .ai-cancel-btn {
+      flex: 1;
+      padding: 10px;
+      border-radius: 10px;
+      font-family: 'Quicksand', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all 0.2s;
+    }
+
+    .ai-save-btn {
+      background: #40e0d0;
+      color: #0a1628;
+    }
+
+    .ai-save-btn:hover {
+      background: #5ce8da;
+    }
+
+    .ai-cancel-btn {
+      background: rgba(255, 255, 255, 0.08);
+      color: #b8d4e3;
+      border-color: rgba(255, 255, 255, 0.12);
+    }
+
+    .ai-cancel-btn:hover {
+      background: rgba(255, 255, 255, 0.12);
+    }
+
+    .ai-test-result {
+      margin-top: 8px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 11px;
+      display: none;
+    }
+
+    .ai-test-result.success {
+      display: block;
+      background: rgba(64, 224, 208, 0.15);
+      color: #40e0d0;
+      border: 1px solid rgba(64, 224, 208, 0.2);
+    }
+
+    .ai-test-result.error {
+      display: block;
+      background: rgba(255, 107, 107, 0.15);
+      color: #ff6b6b;
+      border: 1px solid rgba(255, 107, 107, 0.2);
+    }
+
     /* Scrollbar styling */
     ::-webkit-scrollbar {
       width: 6px;
@@ -921,7 +1279,7 @@
 <body>
   <div class="header">
     <div class="header-left">
-      <span class="logo-icon"><img src="Assets/Logo.png" alt="GoPhishFree"></span>
+      <span class="logo-icon"><img src="Assets/logomini.png" alt="GoPhishFree"></span>
       <span class="title">GoPhishFree</span>
     </div>
     <div class="stats-mini">
@@ -1179,6 +1537,75 @@
           <span class="toggle-slider"></span>
         </div>
       </label>
+      <label class="setting-row" for="ai-enhance-toggle">
+        <div class="setting-info">
+          <span class="setting-label">Enhance with AI</span>
+          <span class="setting-desc">Bring your own API key to enhance with AI (features only, no email text)</span>
+          <span class="ai-status-pill" id="ai-status-pill"></span>
+        </div>
+        <div class="toggle-wrapper">
+          <input type="checkbox" id="ai-enhance-toggle">
+          <span class="toggle-slider"></span>
+        </div>
+      </label>
+      <button class="ai-configure-btn" id="ai-configure-btn">Configure AI Provider</button>
+
+      <!-- Trusted Domains Manager -->
+      <div class="trusted-domains-section">
+        <div class="trusted-domains-header">
+          <span class="trusted-domains-title">Trusted Domains</span>
+          <span class="trusted-domains-count" id="td-count">500+ built-in</span>
+        </div>
+        <div class="trusted-domains-add-row">
+          <input type="text" id="td-input" placeholder="example.com" spellcheck="false">
+          <button class="td-add-btn" id="td-trust-btn" title="Trust this domain (lower risk scores)">+ Trust</button>
+          <button class="td-block-btn" id="td-block-btn" title="Block a built-in trusted domain">- Block</button>
+        </div>
+        <div class="td-list" id="td-list">
+          <span class="td-empty" id="td-empty">No custom domains added yet</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI Configuration Modal -->
+  <div class="ai-modal-overlay" id="ai-modal-overlay">
+    <div class="ai-modal">
+      <div class="ai-modal-header">
+        <span class="ai-modal-title">Configure AI Provider</span>
+        <button class="ai-modal-close" id="ai-modal-close">&times;</button>
+      </div>
+      <div class="ai-modal-body">
+        <div class="ai-field">
+          <label class="ai-field-label">Provider</label>
+          <select id="ai-provider-select">
+            <option value="openai">OpenAI (GPT-4o mini)</option>
+            <option value="anthropic">Anthropic (Claude)</option>
+            <option value="google">Google (Gemini)</option>
+            <option value="azure">Azure OpenAI</option>
+            <option value="custom">Custom Endpoint</option>
+          </select>
+        </div>
+        <div class="ai-field">
+          <label class="ai-field-label">API Key</label>
+          <input type="password" id="ai-api-key" placeholder="sk-... or your provider key" autocomplete="off">
+          <div class="ai-field-hint">Stored locally only. Never synced or sent anywhere except to your chosen provider.</div>
+        </div>
+        <div class="ai-field ai-field-endpoint" id="ai-endpoint-field">
+          <label class="ai-field-label">Custom Endpoint URL</label>
+          <input type="url" id="ai-endpoint-url" placeholder="https://your-api.example.com/v1/chat/completions">
+        </div>
+        <div class="ai-field ai-field-endpoint" id="ai-model-field">
+          <label class="ai-field-label">Model Name</label>
+          <input type="text" id="ai-model-name" placeholder="gpt-4o-mini">
+          <div class="ai-field-hint">For Azure/Custom: specify the deployment or model name.</div>
+        </div>
+        <div class="ai-test-result" id="ai-test-result"></div>
+      </div>
+      <div class="ai-modal-footer">
+        <button class="ai-cancel-btn" id="ai-modal-cancel">Cancel</button>
+        <button class="ai-save-btn" id="ai-modal-save">Save Configuration</button>
+      </div>
     </div>
   </div>
 

@@ -1,25 +1,27 @@
-// ═══════════════════════════════════════════════════════════════════
-// GoPhishFree – Feature Extraction Module
+// =====================================================================
+// GoPhishFree - Feature Extraction Module (Unified Schema)
 //
 // Three classes for extracting phishing signals at different tiers:
 //
-//   FeatureExtractor  (Tier 1)  – 25 URL/email features from Gmail DOM
-//   DnsChecker        (Tier 2)  – 4 DNS-over-HTTPS features (Cloudflare/Google)
-//   PageAnalyzer      (Tier 3)  – 13 page structure features from fetched HTML
+//   FeatureExtractor  (Tier 1)  - URL/email features + BEC/attachment
+//   DnsChecker        (Tier 2)  - DNS-over-HTTPS features
+//   PageAnalyzer      (Tier 3)  - Page structure features from HTML
 //
-// All processing is local. Only DnsChecker sends external requests
-// (domain names only, no email content). PageAnalyzer operates on
-// a DOMParser document — no scripts execute, no resources load.
-// ═══════════════════════════════════════════════════════════════════
+// All features feed into ONE unified model (64 features total).
+// When a tier hasn't run, its features are default-filled with 0 and
+// context flags (dns_ran, deep_scan_ran) tell the model what's missing.
+//
+// Feature order in buildUnifiedVector() MUST match UNIFIED_FEATURES
+// in train_model.py.
+// =====================================================================
 
-// ─────────────────────────────────────────────────────────────────
-// FeatureExtractor – Tier 1 Email Feature Extraction
+// -----------------------------------------------------------------
+// FeatureExtractor - Tier 1 Email/URL + BEC + Attachment Features
 //
-// Extracts 25 ML model features + 10 custom-engineered features
-// from email content visible in the Gmail DOM. No external requests.
-// Feature order in mapToModelInput() MUST match LOCAL_FEATURES in
-// train_model.py.
-// ─────────────────────────────────────────────────────────────────
+// Extracts 25 URL features, 9 custom-rule features, 5 BEC/linkless
+// features, and 5 attachment features from email content visible in
+// the Gmail DOM. No external requests.
+// -----------------------------------------------------------------
 
 class FeatureExtractor {
   constructor() {
@@ -47,7 +49,32 @@ class FeatureExtractor {
       'password', 'login', 'credentials', 'account', 'verify account',
       'update account', 'confirm identity', 'security check'
     ];
+
+    // Financial request keywords (BEC)
+    this.financialKeywords = [
+      'wire', 'wire transfer', 'invoice', 'ach', 'payment', 'transfer',
+      'remittance', 'bank account', 'routing number', 'direct deposit',
+      'purchase order', 'overdue payment', 'outstanding balance'
+    ];
+
+    // Authority/impersonation keywords (BEC)
+    this.authorityKeywords = [
+      'ceo', 'cfo', 'cto', 'coo', 'president', 'director', 'vice president',
+      'payroll', 'it department', 'hr department', 'human resources',
+      'executive', 'managing director', 'board of directors', 'chairman'
+    ];
+
+    // Risky attachment extensions
+    this.riskyExtensions = new Set([
+      'exe', 'bat', 'scr', 'cmd', 'ps1', 'vbs', 'js', 'wsf', 'msi',
+      'com', 'pif', 'hta', 'cpl', 'reg', 'inf', 'lnk',
+      'zip', 'rar', '7z', 'tar', 'gz', 'iso', 'img', 'dmg'
+    ]);
   }
+
+  // ================================================================
+  //  URL Feature Extraction (25 features)
+  // ================================================================
 
   /**
    * Extract URL lexical features
@@ -96,34 +123,278 @@ class FeatureExtractor {
     }
   }
 
+  // ================================================================
+  //  Email Feature Extraction (all local features)
+  // ================================================================
+
   /**
-   * Extract features from email content
+   * Extract all email-level features (URL, custom, BEC, attachment).
+   * Returns a flat object with all feature keys.
    */
   extractEmailFeatures(emailData) {
+    const text = emailData.text || '';
+    const links = emailData.links || [];
+    const attachments = emailData.attachments || [];
+
     const features = {
       // URL features (aggregated from all links)
-      ...this.aggregateURLFeatures(emailData.links || []),
+      ...this.aggregateURLFeatures(links),
 
       // Link mismatch features
-      LinkMismatchCount: this.countLinkMismatches(emailData.links || []),
-      LinkMismatchRatio: this.calculateLinkMismatchRatio(emailData.links || []),
-      FrequentDomainNameMismatch: this.countLinkMismatches(emailData.links || []) > 0 ? 1 : 0,
+      LinkMismatchCount: this.countLinkMismatches(links),
+      LinkMismatchRatio: this.calculateLinkMismatchRatio(links),
+      FrequentDomainNameMismatch: this.countLinkMismatches(links) > 0 ? 1 : 0,
 
       // Header mismatch
       HeaderMismatch: this.detectHeaderMismatch(emailData.senderDisplayName, emailData.senderDomain),
 
       // Text features
-      NumSensitiveWords: this.countSensitiveWords(emailData.text || ''),
-      UrgencyScore: this.calculateUrgencyScore(emailData.text || ''),
-      CredentialRequestScore: this.calculateCredentialRequestScore(emailData.text || ''),
+      NumSensitiveWords: this.countSensitiveWords(text),
+      UrgencyScore: this.calculateUrgencyScore(text),
+      CredentialRequestScore: this.calculateCredentialRequestScore(text),
 
       // Basic counts
-      LinkCount: (emailData.links || []).length,
-      AttachmentCount: (emailData.attachments || []).length
+      LinkCount: links.length,
+
+      // -- BEC / Linkless features --
+      FinancialRequestScore: this.calculateFinancialRequestScore(text),
+      AuthorityImpersonationScore: this.calculateAuthorityImpersonationScore(text),
+      PhoneCallbackPattern: this.detectPhoneCallbackPattern(text),
+      ReplyToMismatch: this.detectReplyToMismatch(
+        emailData.replyTo || '', emailData.senderDomain || ''
+      ),
+      IsLinkless: links.length === 0 ? 1 : 0,
+
+      // -- Attachment features --
+      HasAttachment: attachments.length > 0 ? 1 : 0,
+      AttachmentCount: attachments.length,
+      RiskyAttachmentExtension: this.hasRiskyAttachmentExtension(attachments),
+      DoubleExtensionFlag: this.hasDoubleExtension(attachments),
+      AttachmentNameEntropy: this.calculateAttachmentNameEntropy(attachments)
     };
 
     return features;
   }
+
+  // ================================================================
+  //  BEC / Linkless Feature Methods
+  // ================================================================
+
+  /**
+   * Count financial request keywords (wire, invoice, ACH, etc.)
+   */
+  calculateFinancialRequestScore(text) {
+    const lower = text.toLowerCase();
+    return this.financialKeywords.filter(kw => lower.includes(kw)).length;
+  }
+
+  /**
+   * Count authority/impersonation keywords (CEO, payroll, IT dept, etc.)
+   */
+  calculateAuthorityImpersonationScore(text) {
+    const lower = text.toLowerCase();
+    return this.authorityKeywords.filter(kw => lower.includes(kw)).length;
+  }
+
+  /**
+   * Detect phone callback lure patterns ("call" + phone number)
+   */
+  detectPhoneCallbackPattern(text) {
+    const lower = text.toLowerCase();
+    // Check for "call" near a phone number pattern
+    const hasCallKeyword = /\b(call|phone|dial|ring|contact)\b/.test(lower);
+    const hasPhoneNumber = /(\+?\d[\d\s\-().]{7,}\d)/.test(text);
+    return (hasCallKeyword && hasPhoneNumber) ? 1 : 0;
+  }
+
+  /**
+   * Detect reply-to domain mismatch (reply-to domain != sender domain)
+   */
+  detectReplyToMismatch(replyTo, senderDomain) {
+    if (!replyTo || !senderDomain) return 0;
+    try {
+      const replyDomain = replyTo.includes('@')
+        ? replyTo.split('@')[1].toLowerCase().trim()
+        : replyTo.toLowerCase().trim();
+      if (!replyDomain) return 0;
+      return replyDomain !== senderDomain.toLowerCase() ? 1 : 0;
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  // ================================================================
+  //  Attachment Feature Methods
+  // ================================================================
+
+  /**
+   * Check if any attachment has a risky file extension
+   */
+  hasRiskyAttachmentExtension(attachments) {
+    if (!attachments || attachments.length === 0) return 0;
+    for (const att of attachments) {
+      const name = (att.filename || att.name || '').toLowerCase();
+      const ext = name.split('.').pop();
+      if (this.riskyExtensions.has(ext)) return 1;
+    }
+    return 0;
+  }
+
+  /**
+   * Detect double file extensions (e.g., invoice.pdf.exe)
+   */
+  hasDoubleExtension(attachments) {
+    if (!attachments || attachments.length === 0) return 0;
+    for (const att of attachments) {
+      const name = (att.filename || att.name || '').toLowerCase();
+      const parts = name.split('.');
+      // Double extension: 3+ parts where last part is risky
+      if (parts.length >= 3 && this.riskyExtensions.has(parts[parts.length - 1])) {
+        return 1;
+      }
+    }
+    return 0;
+  }
+
+  /**
+   * Calculate Shannon entropy of attachment filenames (average across all)
+   */
+  calculateAttachmentNameEntropy(attachments) {
+    if (!attachments || attachments.length === 0) return 0;
+
+    let totalEntropy = 0;
+    let count = 0;
+
+    for (const att of attachments) {
+      const name = (att.filename || att.name || '').replace(/\.[^.]+$/, ''); // strip extension
+      if (name.length < 2) continue;
+      totalEntropy += this._shannonEntropy(name);
+      count++;
+    }
+
+    return count > 0 ? totalEntropy / count : 0;
+  }
+
+  /**
+   * Shannon entropy of a string
+   */
+  _shannonEntropy(str) {
+    const freq = {};
+    for (const ch of str) freq[ch] = (freq[ch] || 0) + 1;
+    let entropy = 0;
+    const len = str.length;
+    for (const count of Object.values(freq)) {
+      const p = count / len;
+      entropy -= p * Math.log2(p);
+    }
+    return entropy;
+  }
+
+  // ================================================================
+  //  Unified Feature Vector Builder
+  // ================================================================
+
+  /**
+   * Build the 64-element unified feature vector for model inference.
+   *
+   * ORDER MUST MATCH UNIFIED_FEATURES in train_model.py.
+   *
+   * @param {Object} features     - from extractEmailFeatures()
+   * @param {Object|null} dns     - from DnsChecker.checkDomains() or null
+   * @param {Object|null} page    - from PageAnalyzer.extractFeatures() or null
+   * @param {Object} flags        - { dns_ran: 0|1, deep_scan_ran: 0|1 }
+   * @returns {number[]}          - 64-element array
+   */
+  buildUnifiedVector(features, dns, page, flags) {
+    const f = features || {};
+    const d = dns || { DomainExists: 0, HasMXRecord: 0, MultipleIPs: 0, RandomStringDomain: 0, UnresolvedDomains: 0 };
+    const p = page || { InsecureForms: 0, RelativeFormAction: 0, ExtFormAction: 0, AbnormalFormAction: 0, SubmitInfoToEmail: 0, PctExtHyperlinks: 0, PctExtResourceUrls: 0, ExtFavicon: 0, PctNullSelfRedirectHyperlinks: 0, IframeOrFrame: 0, MissingTitle: 0, ImagesOnlyInForm: 0, EmbeddedBrandName: 0 };
+    const fl = flags || { dns_ran: 0, deep_scan_ran: 0 };
+
+    return [
+      // Group 1: URL/Email Lexical (25)
+      f.NumDots || 0,
+      f.SubdomainLevel || 0,
+      f.PathLevel || 0,
+      f.UrlLength || 0,
+      f.NumDash || 0,
+      f.NumDashInHostname || 0,
+      f.AtSymbol || 0,
+      f.TildeSymbol || 0,
+      f.NumUnderscore || 0,
+      f.NumPercent || 0,
+      f.NumQueryComponents || 0,
+      f.NumAmpersand || 0,
+      f.NumHash || 0,
+      f.NumNumericChars || 0,
+      f.NoHttps || 0,
+      f.IpAddress || 0,
+      f.DomainInSubdomains || 0,
+      f.DomainInPaths || 0,
+      f.HttpsInHostname || 0,
+      f.HostnameLength || 0,
+      f.PathLength || 0,
+      f.QueryLength || 0,
+      f.DoubleSlashInPath || 0,
+      f.NumSensitiveWords || 0,
+      f.FrequentDomainNameMismatch || 0,
+
+      // Group 2: Former custom rules (9)
+      f.SuspiciousTLD || 0,
+      f.ShortenerDomain || 0,
+      f.Punycode || 0,
+      f.LinkMismatchCount || 0,
+      f.LinkMismatchRatio || 0,
+      f.HeaderMismatch || 0,
+      f.UrgencyScore || 0,
+      f.CredentialRequestScore || 0,
+      f.LinkCount || 0,
+
+      // Group 3: DNS features (5)
+      d.DomainExists || 0,
+      d.HasMXRecord || 0,
+      d.MultipleIPs || 0,
+      d.RandomStringDomain || 0,
+      d.UnresolvedDomains || 0,
+
+      // Group 4: Deep Scan page features (13)
+      p.InsecureForms || 0,
+      p.RelativeFormAction || 0,
+      p.ExtFormAction || 0,
+      p.AbnormalFormAction || 0,
+      p.SubmitInfoToEmail || 0,
+      p.PctExtHyperlinks || 0,
+      p.PctExtResourceUrls || 0,
+      p.ExtFavicon || 0,
+      p.PctNullSelfRedirectHyperlinks || 0,
+      p.IframeOrFrame || 0,
+      p.MissingTitle || 0,
+      p.ImagesOnlyInForm || 0,
+      p.EmbeddedBrandName || 0,
+
+      // Group 5: BEC / Linkless features (5)
+      f.FinancialRequestScore || 0,
+      f.AuthorityImpersonationScore || 0,
+      f.PhoneCallbackPattern || 0,
+      f.ReplyToMismatch || 0,
+      f.IsLinkless || 0,
+
+      // Group 6: Attachment features (5)
+      f.HasAttachment || 0,
+      f.AttachmentCount || 0,
+      f.RiskyAttachmentExtension || 0,
+      f.DoubleExtensionFlag || 0,
+      f.AttachmentNameEntropy || 0,
+
+      // Group 7: Context flags (2)
+      fl.dns_ran || 0,
+      fl.deep_scan_ran || 0
+    ];
+  }
+
+  // ================================================================
+  //  URL Aggregation & Helper Methods
+  // ================================================================
 
   /**
    * Aggregate URL features from multiple links
@@ -270,19 +541,15 @@ class FeatureExtractor {
 
   /**
    * Check if domain name appears in subdomain (phishing technique)
-   * Example: paypal.com.phishing.com -> domain "paypal.com" in subdomain
    */
   checkDomainInSubdomains(hostname) {
     if (!hostname) return false;
 
     const parts = hostname.split('.');
-    if (parts.length < 3) return false; // Need at least subdomain.domain.tld
+    if (parts.length < 3) return false;
 
-    // Check if any subdomain part looks like a full domain
-    // e.g., "paypal.com" in "paypal.com.evil.com"
     for (let i = 0; i < parts.length - 2; i++) {
       const subdomain = parts.slice(i, i + 2).join('.');
-      // Check if this looks like a common domain pattern
       if (subdomain.match(/^[a-z0-9-]+\.(com|net|org|gov|edu)$/i)) {
         return true;
       }
@@ -293,35 +560,28 @@ class FeatureExtractor {
 
   /**
    * Check if domain name appears in URL path (phishing technique)
-   * Example: evil.com/paypal.com/login -> domain "paypal.com" in path
    */
   checkDomainInPaths(hostname, pathname) {
     if (!pathname || pathname === '/') return false;
 
     const pathLower = pathname.toLowerCase();
-
-    // Extract actual domain from hostname
     const domainParts = hostname.split('.');
     if (domainParts.length < 2) return false;
 
-    const actualDomain = domainParts.slice(-2).join('.'); // Get domain.tld
-
-    // Check if a different domain appears in the path
+    const actualDomain = domainParts.slice(-2).join('.');
     const domainPattern = /([a-z0-9-]+\.(com|net|org|gov|edu|io|co))/gi;
     const matches = pathLower.match(domainPattern);
 
     if (matches) {
-      // Check if any matched domain is different from the actual hostname domain
       for (const match of matches) {
         if (!actualDomain.includes(match) && !match.includes(actualDomain)) {
-          return true; // Found a different domain in path
+          return true;
         }
       }
     }
 
     return false;
   }
-
 
   /**
    * Get default URL features (for missing/invalid URLs)
@@ -356,87 +616,31 @@ class FeatureExtractor {
       Punycode: 0
     };
   }
-
-  /**
-   * Map extracted features to ML model input format (25 dataset features).
-   * ORDER MUST MATCH train_model.py LOCAL_FEATURES exactly.
-   */
-  mapToModelInput(features) {
-    return [
-      features.NumDots || 0,
-      features.SubdomainLevel || 0,
-      features.PathLevel || 0,
-      features.UrlLength || 0,
-      features.NumDash || 0,
-      features.NumDashInHostname || 0,
-      features.AtSymbol || 0,
-      features.TildeSymbol || 0,
-      features.NumUnderscore || 0,
-      features.NumPercent || 0,
-      features.NumQueryComponents || 0,
-      features.NumAmpersand || 0,
-      features.NumHash || 0,
-      features.NumNumericChars || 0,
-      features.NoHttps || 0,
-      features.IpAddress || 0,
-      features.DomainInSubdomains || 0,
-      features.DomainInPaths || 0,
-      features.HttpsInHostname || 0,
-      features.HostnameLength || 0,
-      features.PathLength || 0,
-      features.QueryLength || 0,
-      features.DoubleSlashInPath || 0,
-      features.NumSensitiveWords || 0,
-      features.FrequentDomainNameMismatch || 0
-    ];
-  }
-
-  /**
-   * Return the 10 custom-engineered features used for rule-based
-   * adjustment on top of the ML prediction.
-   */
-  getCustomFeatures(features) {
-    return {
-      SuspiciousTLD:          features.SuspiciousTLD || 0,
-      ShortenerDomain:        features.ShortenerDomain || 0,
-      Punycode:               features.Punycode || 0,
-      LinkMismatchCount:      features.LinkMismatchCount || 0,
-      LinkMismatchRatio:      features.LinkMismatchRatio || 0,
-      HeaderMismatch:         features.HeaderMismatch || 0,
-      UrgencyScore:           features.UrgencyScore || 0,
-      CredentialRequestScore: features.CredentialRequestScore || 0,
-      LinkCount:              features.LinkCount || 0,
-      AttachmentCount:        features.AttachmentCount || 0
-    };
-  }
 }
 
-// ─────────────────────────────────────────────────────────────────
-// DnsChecker – Tier 2 DNS-over-HTTPS feature extraction
+// -----------------------------------------------------------------
+// DnsChecker - Tier 2 DNS-over-HTTPS feature extraction
 // Uses public Cloudflare / Google DoH endpoints (no API keys).
 // Only domain names are sent; no email content leaves the device.
-// ─────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------
 
 class DnsChecker {
   constructor() {
-    this.cache = new Map();        // domain → { result, timestamp }
+    this.cache = new Map();        // domain -> { result, timestamp }
     this.CACHE_TTL = 5 * 60_000;  // 5 minutes
     this.TIMEOUT   = 4_000;       // 4 s per request
   }
 
-  // ── public API ───────────────────────────────────────────────
+  // -- public API ---------------------------------------------------
 
   /**
    * Return Tier-2 DNS features for a single domain.
-   * All values are numeric (0 or 1, or a float for entropy).
    */
   async checkDomain(domain) {
     if (!domain) return this.defaultFeatures();
 
-    // Normalise
     domain = domain.toLowerCase().replace(/\.+$/, '');
 
-    // Cache hit?
     const cached = this.cache.get(domain);
     if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
       return cached.result;
@@ -450,14 +654,12 @@ class DnsChecker {
     };
 
     try {
-      // A-record check (domain existence + IP count)
       const aRes = await this.dnsQuery(domain, 'A');
       if (aRes && aRes.Answer && aRes.Answer.length > 0) {
         result.DomainExists = 1;
         result.MultipleIPs  = aRes.Answer.filter(r => r.type === 1).length > 1 ? 1 : 0;
       }
 
-      // MX-record check (legitimate email senders usually have MX records)
       const mxRes = await this.dnsQuery(domain, 'MX');
       if (mxRes && mxRes.Answer && mxRes.Answer.length > 0) {
         result.HasMXRecord = 1;
@@ -471,36 +673,30 @@ class DnsChecker {
   }
 
   /**
-   * Check multiple domains (e.g. sender + all link domains) in parallel.
-   * Returns an *aggregated* feature object.
+   * Check multiple domains in parallel. Returns aggregated features.
    */
   async checkDomains(domains) {
     if (!domains || domains.length === 0) return this.defaultFeatures();
 
-    // De-duplicate
     const unique = [...new Set(domains.map(d => d.toLowerCase().replace(/\.+$/, '')))];
-
     const results = await Promise.all(unique.map(d => this.checkDomain(d)));
 
-    // Aggregate: if ANY domain fails a check, flag it
     return {
       DomainExists:       results.every(r => r.DomainExists)       ? 1 : 0,
       HasMXRecord:        results.some(r => r.HasMXRecord)         ? 1 : 0,
       MultipleIPs:        results.some(r => r.MultipleIPs)         ? 1 : 0,
       RandomStringDomain: results.some(r => r.RandomStringDomain)  ? 1 : 0,
-      // Extra: count of domains that do NOT resolve
       UnresolvedDomains:  results.filter(r => !r.DomainExists).length
     };
   }
 
-  // ── DNS-over-HTTPS query ─────────────────────────────────────
+  // -- DNS-over-HTTPS query -----------------------------------------
 
   async dnsQuery(domain, type) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.TIMEOUT);
 
     try {
-      // Primary: Cloudflare
       const resp = await fetch(
         `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(domain)}&type=${type}`,
         {
@@ -513,7 +709,6 @@ class DnsChecker {
       return await resp.json();
     } catch (err) {
       clearTimeout(timer);
-      // Fallback: Google DoH
       try {
         const resp2 = await fetch(
           `https://dns.google/resolve?name=${encodeURIComponent(domain)}&type=${type}`
@@ -524,27 +719,19 @@ class DnsChecker {
     }
   }
 
-  // ── Random-string / entropy detection ────────────────────────
+  // -- Random-string / entropy detection ----------------------------
 
-  /**
-   * Heuristic: phishing domains often use random alphanumeric strings.
-   * Shannon entropy > 3.5 on the registrable part is a strong signal.
-   */
   isRandomString(domain) {
     const parts = domain.split('.');
     if (parts.length < 2) return false;
-
-    // Take everything except the public-suffix TLD
     const name = parts.slice(0, -1).join('');
-    if (name.length < 6) return false;   // too short to judge
-
+    if (name.length < 6) return false;
     return this.shannonEntropy(name) > 3.5;
   }
 
   shannonEntropy(str) {
     const freq = {};
     for (const ch of str) freq[ch] = (freq[ch] || 0) + 1;
-
     let entropy = 0;
     const len = str.length;
     for (const count of Object.values(freq)) {
@@ -554,7 +741,7 @@ class DnsChecker {
     return entropy;
   }
 
-  // ── Defaults ─────────────────────────────────────────────────
+  // -- Defaults -----------------------------------------------------
 
   defaultFeatures() {
     return {
@@ -567,16 +754,14 @@ class DnsChecker {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────
-// PageAnalyzer – Tier 3 Deep Scan feature extraction
-// Parses an HTML Document (from DOMParser) and extracts 13 features
-// that correspond to Kaggle dataset columns requiring a page visit.
-// No network calls – pure DOM traversal.
-// ─────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------
+// PageAnalyzer - Tier 3 Deep Scan feature extraction
+// Parses an HTML Document (from DOMParser) and extracts 13 features.
+// No network calls - pure DOM traversal.
+// -----------------------------------------------------------------
 
 class PageAnalyzer {
   constructor() {
-    // Well-known brand names for EmbeddedBrandName detection
     this.brandNames = [
       'paypal', 'apple', 'google', 'microsoft', 'amazon', 'facebook',
       'netflix', 'ebay', 'chase', 'wellsfargo', 'bankofamerica', 'citibank',
@@ -586,16 +771,6 @@ class PageAnalyzer {
     ];
   }
 
-  /**
-   * Extract all 13 deep-scan features from a parsed Document.
-   * @param {Document} doc – HTML document from DOMParser
-   * @param {string}   pageUrl – the URL the HTML was fetched from
-   * @returns {Object}  feature map with the 13 Kaggle-compatible keys
-   *
-   * SECURITY: This operates on a DOMParser document — no scripts can
-   * execute, no resources are loaded, no network requests are made.
-   * DOM queries are bounded by the 50k-node check in content.js.
-   */
   extractFeatures(doc, pageUrl) {
     if (!doc || !doc.querySelectorAll) return this.defaultFeatures();
 
@@ -603,20 +778,15 @@ class PageAnalyzer {
     try { pageDomain = new URL(pageUrl).hostname.toLowerCase(); } catch (_) {}
 
     return {
-      // ── Form features (5) ──
       InsecureForms:       this.detectInsecureForms(doc),
       RelativeFormAction:  this.detectRelativeFormAction(doc),
       ExtFormAction:       this.detectExtFormAction(doc, pageDomain),
       AbnormalFormAction:  this.detectAbnormalFormAction(doc),
       SubmitInfoToEmail:   this.detectSubmitToEmail(doc),
-
-      // ── External resource features (4) ──
       PctExtHyperlinks:              this.calcPctExtHyperlinks(doc, pageDomain),
       PctExtResourceUrls:            this.calcPctExtResourceUrls(doc, pageDomain),
       ExtFavicon:                    this.detectExtFavicon(doc, pageDomain),
       PctNullSelfRedirectHyperlinks: this.calcPctNullSelfRedirect(doc, pageUrl),
-
-      // ── Page structure (4) ──
       IframeOrFrame:      this.detectIframeOrFrame(doc),
       MissingTitle:       this.detectMissingTitle(doc),
       ImagesOnlyInForm:   this.detectImagesOnlyInForm(doc),
@@ -624,9 +794,8 @@ class PageAnalyzer {
     };
   }
 
-  // ── Form features ─────────────────────────────────────────────
+  // -- Form features ------------------------------------------------
 
-  /** Forms with action starting with http: (not https) */
   detectInsecureForms(doc) {
     const forms = doc.querySelectorAll('form');
     for (const form of forms) {
@@ -636,7 +805,6 @@ class PageAnalyzer {
     return 0;
   }
 
-  /** Forms with relative action URL (no protocol) */
   detectRelativeFormAction(doc) {
     const forms = doc.querySelectorAll('form');
     for (const form of forms) {
@@ -648,7 +816,6 @@ class PageAnalyzer {
     return 0;
   }
 
-  /** Forms submitting to a different domain */
   detectExtFormAction(doc, pageDomain) {
     const forms = doc.querySelectorAll('form');
     for (const form of forms) {
@@ -663,7 +830,6 @@ class PageAnalyzer {
     return 0;
   }
 
-  /** Forms with empty, #, about:blank, or javascript:void action */
   detectAbnormalFormAction(doc) {
     const forms = doc.querySelectorAll('form');
     for (const form of forms) {
@@ -676,7 +842,6 @@ class PageAnalyzer {
     return 0;
   }
 
-  /** Forms with mailto: action */
   detectSubmitToEmail(doc) {
     const forms = doc.querySelectorAll('form');
     for (const form of forms) {
@@ -686,9 +851,8 @@ class PageAnalyzer {
     return 0;
   }
 
-  // ── External resource features ────────────────────────────────
+  // -- External resource features -----------------------------------
 
-  /** Percentage of <a> links pointing to external domains (0.0 – 1.0) */
   calcPctExtHyperlinks(doc, pageDomain) {
     const links = doc.querySelectorAll('a[href]');
     if (links.length === 0) return 0;
@@ -705,7 +869,6 @@ class PageAnalyzer {
     return external / links.length;
   }
 
-  /** Percentage of resources (img, script, link[rel=stylesheet]) from external domains */
   calcPctExtResourceUrls(doc, pageDomain) {
     const resources = [
       ...doc.querySelectorAll('img[src]'),
@@ -726,7 +889,6 @@ class PageAnalyzer {
     return external / resources.length;
   }
 
-  /** Favicon loaded from external domain */
   detectExtFavicon(doc, pageDomain) {
     const icons = doc.querySelectorAll('link[rel~="icon"], link[rel="shortcut icon"]');
     for (const icon of icons) {
@@ -741,7 +903,6 @@ class PageAnalyzer {
     return 0;
   }
 
-  /** Percentage of links that are #, empty, self-referencing, or javascript:void */
   calcPctNullSelfRedirect(doc, pageUrl) {
     const links = doc.querySelectorAll('a[href]');
     if (links.length === 0) return 0;
@@ -756,20 +917,17 @@ class PageAnalyzer {
     return nullSelf / links.length;
   }
 
-  // ── Page structure features ───────────────────────────────────
+  // -- Page structure features --------------------------------------
 
-  /** Page uses <iframe> or <frame> */
   detectIframeOrFrame(doc) {
     return doc.querySelectorAll('iframe, frame').length > 0 ? 1 : 0;
   }
 
-  /** No <title> element or empty title */
   detectMissingTitle(doc) {
     const title = doc.querySelector('title');
     return (!title || !title.textContent.trim()) ? 1 : 0;
   }
 
-  /** Forms that contain only images, no text/password/email inputs */
   detectImagesOnlyInForm(doc) {
     const forms = doc.querySelectorAll('form');
     for (const form of forms) {
@@ -783,7 +941,6 @@ class PageAnalyzer {
     return 0;
   }
 
-  /** Brand name appears in page text but domain doesn't match the brand */
   detectEmbeddedBrand(doc, pageDomain) {
     const bodyText = (doc.body ? doc.body.textContent : '').toLowerCase();
     for (const brand of this.brandNames) {
@@ -794,7 +951,7 @@ class PageAnalyzer {
     return 0;
   }
 
-  // ── Defaults ──────────────────────────────────────────────────
+  // -- Defaults -----------------------------------------------------
 
   defaultFeatures() {
     return {
