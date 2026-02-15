@@ -216,7 +216,7 @@ GoPhishFree/
 ├── generate_sprint2_docs.py # Sprint 2 document generator
 ├── Phishing_Dataset/        # Kaggle phishing dataset
 ├── model/                   # Generated model files (model_unified.json)
-├── Assets/                  # Logo.png, Banner.png, Icon.ico
+├── Assets/                  # Logo.png, logomini.png, Banner.png, icon1.ico
 ├── Framework/               # Architecture diagrams and PDF
 ├── docs/                    # Sprint documents
 ├── ARCHITECTURE.md          # Architecture & UML diagrams (Mermaid)

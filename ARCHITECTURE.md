@@ -48,7 +48,7 @@ graph TB
 
         subgraph "Static Assets"
             MODEL[model/<br/>model_unified.json<br/>64-feature calibrated RF]
-            ASSETS[Assets/<br/>Logo.png · Banner.png]
+            ASSETS[Assets/<br/>Logo.png · logomini.png · Banner.png · icon1.ico]
             MF[manifest.json]
         end
     end
@@ -622,7 +622,7 @@ graph TD
     CS -->|"loads"| BANNER[Assets/Banner.png]
 
     PH -->|"scripts"| PJ[popup.js]
-    PH -->|"loads"| LOGO[Assets/Logo.png]
+    PH -->|"loads"| LOGO[Assets/logomini.png]
     PJ -->|"messages"| BG
 
     BG -->|"reads/writes"| ST[(chrome.storage.local)]
