@@ -1,0 +1,91 @@
+/*
+ * @file index.css
+ * @description Global stylesheet for the GoPhishFree landing page. Imports Tailwind CSS,
+ *              defines custom design-token CSS variables (colors), applies base resets,
+ *              and provides reusable container utility classes for consistent page layout.
+ *
+ * @programmers Ty Farrington, Andrew Reyes, Brett Suhr, Nicholas Holmes, Kaleb Howard
+ * @dateCreated 2026-02-14
+ * @dateRevised 2026-02-14 - Sprint 2: Initial website creation with comprehensive documentation (All programmers)
+ *
+ * @preconditions Tailwind CSS v4+ must be installed and the Vite Tailwind plugin must be active.
+ *                The Inter font family must be loaded via Google Fonts in index.html.
+ * @postconditions All global styles, theme variables, and container utilities are available
+ *                 to every component in the application.
+ * @errorConditions If Tailwind CSS is not installed, the @import directive will fail at build time.
+ * @sideEffects Overrides browser default margins, padding, and box-sizing globally.
+ * @invariants The dark color scheme (surface #0a0a0f, text #f1f5f9) is applied site-wide.
+ * @knownFaults None.
+ */
+
+/* ============================================================
+ * Tailwind CSS Framework Import
+ * ============================================================ */
+@import "tailwindcss";
+
+/* ============================================================
+ * Custom Theme Variables (Design Tokens)
+ * ============================================================ */
+@theme {
+  --color-primary: #0d9488;
+  --color-primary-light: #14b8a6;
+  --color-primary-dark: #0f766e;
+  --color-accent: #10b981;
+  --color-surface: #0a0a0f;
+  --color-surface-light: #111827;
+  --color-surface-card: #1a1a2e;
+  --color-text-primary: #f1f5f9;
+  --color-text-secondary: #94a3b8;
+  --color-glow: #14b8a680;
+}
+
+/* ============================================================
+ * Global Reset & Base Styles
+ * ============================================================ */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background-color: #0a0a0f;
+  color: #f1f5f9;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+/* ============================================================
+ * Reusable Container Utility Classes
+ * Provide consistent horizontal centering and max-width constraints.
+ * ============================================================ */
+
+/* Full-width container — scales to 90% of viewport, capped at 80rem */
+.container-main {
+  width: 90%;
+  max-width: 80rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Narrower container for text-heavy sections like FAQ */
+.container-narrow {
+  width: 90%;
+  max-width: 50rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Mid container for CTA cards */
+.container-mid {
+  width: 90%;
+  max-width: 64rem;
+  margin-left: auto;
+  margin-right: auto;
+}

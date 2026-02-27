@@ -1,25 +1,80 @@
-// =====================================================================
-// GoPhishFree - Gmail Content Script (Unified Model)
-//
-// Core content script injected into Gmail. Handles the full
-// email scanning lifecycle:
-//
-//   1. Detect email opens via URL monitoring and DOM mutations
-//   2. Extract email features (links, sender, text, attachments, BEC)
-//   3. Build 64-feature unified vector (email + DNS + page + BEC + flags)
-//   4. Run single calibrated Random Forest: riskScore = round(100 * prob)
-//   5. Display risk badge on email header + analysis side panel
-//   6. Deep Scan: fetch linked pages, fill page features, re-run model
-//   7. Report Phish: manual severity selection dialog
-//
-// All ML inference runs locally. No post-score point adding.
-// Score = round(100 * calibrated_probability) -- stable 0-100.
-// =====================================================================
+/**
+ * @file content.js
+ * @description Core content script for the GoPhishFree Chrome extension, injected into
+ *   Gmail pages to perform real-time phishing detection and risk assessment. This script
+ *   orchestrates the full email scanning lifecycle: detecting email opens via URL and DOM
+ *   monitoring, extracting email features (links, sender info, text content, attachments,
+ *   BEC patterns), building a 64-feature unified vector, running a calibrated Random Forest
+ *   model for local ML inference, displaying risk badges and an analysis side panel, and
+ *   optionally invoking cloud-based AI analysis and deep scan of linked pages.
+ *
+ * @programmers Ty Farrington, Andrew Reyes, Brett Suhr, Nicholas Holmes, Kaleb Howard
+ * @dateCreated 2025-02-01
+ * @dateRevised 2026-02-14 - Sprint 2: Added comprehensive comments and documentation (All programmers)
+ *
+ * @preconditions
+ *   - The script must be injected into a Gmail page (mail.google.com).
+ *   - The FeatureExtractor class must be loaded before this script executes.
+ *   - The Chrome extension APIs (chrome.runtime, chrome.storage) must be available.
+ *   - The ML model JSON (model/model_unified.json or model/model_trees.json) must be
+ *     accessible via chrome.runtime.getURL().
+ *   - Optional: DnsChecker and PageAnalyzer classes may be loaded for enhanced scanning.
+ *
+ * @acceptableInput
+ *   - Gmail DOM elements containing email data (sender, links, body text, attachments).
+ *   - ML model JSON with fields: trees, scaler_mean, scaler_scale, calibration.
+ *   - User settings from chrome.storage.local (enhancedScanning, aiEnhanceEnabled,
+ *     customTrustedDomains, customBlockedDomains).
+ *
+ * @unacceptableInput
+ *   - Non-Gmail pages (script will fail to find expected DOM elements).
+ *   - Malformed or missing ML model JSON (inference falls back to rules-based scoring).
+ *   - Corrupted chrome.storage data (gracefully handled with defaults).
+ *
+ * @postconditions
+ *   - A risk badge (low/medium/high/dangerous) is displayed on the email header.
+ *   - An analysis side panel is available with detailed risk indicators.
+ *   - Scan results are persisted to chrome.storage via background script messaging.
+ *   - The fish collection is updated in extension storage.
+ *
+ * @returnValues This script does not export or return values; it operates via side effects
+ *   (DOM manipulation, chrome.storage writes, chrome.runtime messaging).
+ *
+ * @errorConditions
+ *   - FeatureExtractor not loaded: script exits immediately with console error.
+ *   - ML model fetch failure: falls back to default probability (0.5).
+ *   - DNS check failure: continues scan without DNS features.
+ *   - Deep scan page fetch failure: logs error, restores previous badge.
+ *   - AI analysis failure: displays "AI unavailable" in side panel.
+ *
+ * @sideEffects
+ *   - Injects UI elements into the Gmail DOM (risk badges, side panel, overlays).
+ *   - Sends messages to the background service worker (saveScanResult, runAiAnalysis,
+ *     requestPermissions, fetchPageHTML).
+ *   - Reads and writes to chrome.storage.local.
+ *   - Registers MutationObserver on document.body and URL polling interval.
+ *
+ * @invariants
+ *   - Risk scores are always integers in the range [0, 100].
+ *   - Only one scan can be in progress at a time (guarded by scanInProgress flag).
+ *   - The ML model, once loaded, is immutable for the lifetime of the page.
+ *   - No raw email text or subject lines are sent to external AI services.
+ *
+ * @knownFaults
+ *   - Gmail DOM selectors may break if Google changes the Gmail HTML structure.
+ *   - The MutationObserver may fire redundantly, though duplicate scans are prevented.
+ *   - Free email provider list and trusted domain list require manual maintenance.
+ *   - Deep scan is limited to 10 unique URLs and 2MB of HTML per page.
+ */
 
 (function() {
   'use strict';
   
-  // -------------------- Fish Type Definitions ----------------------
+  // ================================================================
+  //  Fish Type Definitions
+  //  Maps risk score ranges to themed fish characters used for visual
+  //  feedback in badges and the "fish caught" celebration animation.
+  // ================================================================
   const FISH_TYPES = {
     friendly: {
       emoji: '\u{1F41F}',
@@ -51,9 +106,13 @@
     }
   };
   
-  // -------------------- Trusted Domain Whitelist --------------------
-  // 500+ well-known legitimate domains. Combined with user-managed
-  // custom domains stored in chrome.storage.local.
+  // ================================================================
+  //  Trusted Domain Whitelist
+  //  500+ well-known legitimate domains used for post-model score
+  //  dampening. Emails from these domains (that lack phishing signals)
+  //  receive a capped risk score to reduce false positives. Combined
+  //  at runtime with user-managed custom domains from chrome.storage.
+  // ================================================================
   const TRUSTED_DOMAINS = new Set([
     // ── Big Tech & Platforms ──
     // NOTE: Free email providers (gmail.com, outlook.com, icloud.com, etc.)
@@ -744,9 +803,12 @@
     'better.com'
   ]);
 
-  // ── Free / Public Email Providers ──
-  // Anyone can register on these — they must NOT get trusted dampening.
-  // Phishing is commonly sent from free accounts on these providers.
+  // ================================================================
+  //  Free / Public Email Providers
+  //  Anyone can register on these services, so they must NOT receive
+  //  trusted-domain score dampening. Phishing is commonly sent from
+  //  free accounts on these providers. Checked via isFreeEmailProvider().
+  // ================================================================
   const FREE_EMAIL_PROVIDERS = new Set([
     // Google
     'gmail.com', 'googlemail.com',
@@ -789,11 +851,14 @@
     return FREE_EMAIL_PROVIDERS.has(d);
   }
 
-  // ── User-managed custom trusted domains (loaded from chrome.storage) ──
+  // ================================================================
+  //  User-Managed Custom Trusted/Blocked Domains
+  //  Loaded from chrome.storage.local on startup. Users can add custom
+  //  trusted domains or block built-in ones via the extension options.
+  // ================================================================
   let userTrustedDomains = new Set();
-  let userBlockedDomains = new Set();   // user can also force-remove built-in trusted domains
+  let userBlockedDomains = new Set();
 
-  // Load user's custom trusted/blocked domains on startup
   if (typeof chrome !== 'undefined' && chrome.storage) {
     chrome.storage.local.get(['customTrustedDomains', 'customBlockedDomains'], (result) => {
       if (result.customTrustedDomains && Array.isArray(result.customTrustedDomains)) {
@@ -885,13 +950,23 @@
     return signals;
   }
 
-  // -------------------- Module Dependencies ------------------------
+  // ================================================================
+  //  Module Dependency Validation
+  //  Ensures required classes are loaded before proceeding. The
+  //  FeatureExtractor is mandatory; DnsChecker and PageAnalyzer are
+  //  optional enhancements for Tier 2 (DNS) and Tier 3 (Deep Scan).
+  // ================================================================
   if (typeof FeatureExtractor === 'undefined') {
     console.error('GoPhishFree: FeatureExtractor not loaded');
     return;
   }
   
-  // -------------------- State & Instances ---------------------------
+  // ================================================================
+  //  State Variables & Module Instances
+  //  Core runtime state for the content script. The extractor builds
+  //  feature vectors; dnsChecker and pageAnalyzer are optional Tier 2/3
+  //  modules. Cached scan data enables rescore after deep scan.
+  // ================================================================
   const extractor    = new FeatureExtractor();
   const dnsChecker   = (typeof DnsChecker   !== 'undefined') ? new DnsChecker()   : null;
   const pageAnalyzer = (typeof PageAnalyzer !== 'undefined') ? new PageAnalyzer() : null;
@@ -911,12 +986,21 @@
   let lastFishData    = null;
   let lastAiResult    = null;       // Last AI analysis result
   
-  // -------------------- Bootstrap ----------------------------------
+  // ================================================================
+  //  Bootstrap Sequence
+  //  Initializes the extension: load user settings, then ML model,
+  //  then create UI elements and start observing Gmail for email opens.
+  // ================================================================
   loadSettings().then(() => loadModel()).then(() => {
     initUI();
     observeGmailChanges();
   });
   
+  /**
+   * Determine the fish type key based on a numeric risk score.
+   * @param {number} riskScore - Integer risk score in range [0, 100].
+   * @returns {string} One of 'shark', 'phishy', 'suspicious', or 'friendly'.
+   */
   function getFishType(riskScore) {
     if (riskScore >= 90) return 'shark';
     if (riskScore >= 76) return 'phishy';
@@ -924,6 +1008,11 @@
     return 'friendly';
   }
   
+  /**
+   * Retrieve the full fish data object (emoji, name, description) for a risk score.
+   * @param {number} riskScore - Integer risk score in range [0, 100].
+   * @returns {Object} Fish data with properties: emoji, name, description, minRisk, maxRisk, type.
+   */
   function getFishData(riskScore) {
     const type = getFishType(riskScore);
     return { ...FISH_TYPES[type], type };
@@ -938,8 +1027,16 @@
     
   // ================================================================
   //  UI Initialization
+  //  Creates and injects the side panel, overlay, and attaches event
+  //  listeners for the close button, deep scan, and report phish actions.
   // ================================================================
 
+  /**
+   * Build and inject the GoPhishFree side panel and overlay into the Gmail DOM.
+   * Sets up the analysis panel structure including score display, risk indicators,
+   * suspicious links list, AI analysis section, deep scan controls, and report button.
+   * @returns {void}
+   */
   function initUI() {
     const overlay = document.createElement('div');
     overlay.className = 'gophishfree-overlay';
@@ -1033,8 +1130,17 @@
   
   // ================================================================
   //  Fish Caught Animation
+  //  Displays a celebratory popup when a phishing email is caught or
+  //  reported, showing the fish emoji, name, and risk score briefly.
   // ================================================================
 
+  /**
+   * Display a timed "fish caught" celebration popup overlay with the fish
+   * emoji, name, description, and risk score. Auto-dismisses after 2.5 seconds.
+   * @param {Object} fishData - Fish type data with emoji, name, and description.
+   * @param {number} riskScore - The final risk score to display (0-100).
+   * @returns {void}
+   */
   function showFishCaughtAnimation(fishData, riskScore) {
     const splash = document.createElement('div');
     splash.className = 'gophishfree-splash-overlay';
@@ -1067,8 +1173,17 @@
   
   // ================================================================
   //  Gmail DOM Observation
+  //  Monitors Gmail for email navigation events using both URL polling
+  //  (setInterval) and a MutationObserver on document.body. When a new
+  //  email is detected, triggers the scan pipeline.
   // ================================================================
 
+  /**
+   * Start observing Gmail for email open events. Uses a combination of
+   * URL change polling (every 1 second) and DOM MutationObserver to detect
+   * when the user navigates to a new email thread.
+   * @returns {void}
+   */
   function observeGmailChanges() {
     checkEmailView();
     
@@ -1090,6 +1205,12 @@
     });
   }
   
+  /**
+   * Check if the user is currently viewing an email and whether it is a
+   * new email that hasn't been scanned yet. Extracts the email ID from
+   * the Gmail URL hash or DOM attributes and triggers scanEmail() if new.
+   * @returns {void}
+   */
   function checkEmailView() {
     const urlMatch = window.location.href.match(/\/mail\/u\/\d+\/#inbox\/([a-zA-Z0-9]+)/);
     const emailId = urlMatch ? urlMatch[1] : null;
@@ -1109,9 +1230,20 @@
   }
   
   // ================================================================
-  //  Email Scanning
+  //  Email Scanning Pipeline
+  //  Main orchestrator: extracts email data from DOM, runs feature
+  //  extraction, optional DNS checks, ML inference, displays results,
+  //  persists to storage, and triggers AI analysis if enabled.
   // ================================================================
 
+  /**
+   * Perform a full phishing scan on the currently viewed email. Extracts email
+   * data from the DOM, builds feature vectors, runs optional DNS checks (Tier 2),
+   * performs ML inference, displays the risk badge and side panel, saves results
+   * to extension storage, and auto-triggers AI analysis if enabled.
+   * @param {string} emailId - Unique identifier for the email (from URL or DOM).
+   * @returns {Promise<void>}
+   */
   async function scanEmail(emailId) {
     if (scanInProgress) return;
     scanInProgress = true;
@@ -1214,8 +1346,18 @@
   
   // ================================================================
   //  Email Data Extraction from Gmail DOM
+  //  Parses the Gmail page to extract sender info, links, body text,
+  //  reply-to header, and attachment metadata from DOM elements.
   // ================================================================
 
+  /**
+   * Extract email metadata and content from the Gmail DOM. Queries for
+   * sender email/display name, reply-to header, all anchor links, body
+   * text content, and attachment filenames.
+   * @returns {Object|null} Extracted email data object with properties:
+   *   senderEmail, senderDisplayName, senderDomain, replyTo, links[], text,
+   *   attachments[]. Returns null if extraction fails.
+   */
   function extractEmailData() {
     try {
       const senderElement = document.querySelector('[email]') || 
@@ -1301,9 +1443,16 @@
   }
   
   // ================================================================
-  //  Settings
+  //  Settings Management
+  //  Loads user preferences from chrome.storage.local and listens for
+  //  live changes to toggle scanning modes and domain lists.
   // ================================================================
 
+  /**
+   * Load user settings from chrome.storage.local, including enhanced scanning
+   * (DNS checks) and AI enhancement toggles. Resolves when settings are loaded.
+   * @returns {Promise<void>}
+   */
   async function loadSettings() {
     return new Promise(resolve => {
       chrome.storage.local.get(['enhancedScanning', 'aiEnhanceEnabled'], data => {
@@ -1316,6 +1465,10 @@
     });
   }
 
+  /**
+   * Live listener for chrome.storage changes. Updates local state variables
+   * when the user modifies settings in the extension options page.
+   */
   chrome.storage.onChanged.addListener((changes) => {
     if (changes.enhancedScanning) {
       enhancedScanning = changes.enhancedScanning.newValue !== false;
@@ -1339,6 +1492,9 @@
 
   // ================================================================
   //  ML Model Loading (Unified)
+  //  Fetches the Random Forest model JSON from the extension bundle.
+  //  Tries model_unified.json first, falls back to legacy model_trees.json.
+  //  The model contains decision trees, scaler params, and calibration data.
   // ================================================================
 
   /**
@@ -1377,6 +1533,9 @@
 
   // ================================================================
   //  Unified Inference Pipeline
+  //  Builds the 64-feature vector, traverses the Random Forest, applies
+  //  isotonic calibration, then applies post-model BEC boosts and
+  //  trusted-domain dampening to produce the final risk score.
   // ================================================================
 
   /**
@@ -1552,6 +1711,9 @@
 
   // ================================================================
   //  Calibrated Random Forest Prediction
+  //  Z-score normalizes the feature vector, traverses each decision tree
+  //  for a soft-vote probability, then applies isotonic calibration to
+  //  map raw probabilities to calibrated phishing probabilities.
   // ================================================================
 
   /**
@@ -1625,7 +1787,9 @@
   }
 
   // ================================================================
-  //  Reason Derivation (no score manipulation)
+  //  Reason Derivation (Read-Only)
+  //  Inspects feature values to generate human-readable risk indicator
+  //  strings for the side panel UI. Does NOT modify the risk score.
   // ================================================================
 
   /**
@@ -1734,6 +1898,10 @@
 
   // ================================================================
   //  AI Enhancement (Cloud BYOK)
+  //  Optional cloud-based AI analysis using the user's own API key.
+  //  Builds a privacy-preserving payload (features only, no raw text),
+  //  gates the call based on local confidence, and displays results
+  //  in the side panel with an agreement badge.
   // ================================================================
 
   /**
@@ -1981,6 +2149,10 @@
 
   // ================================================================
   //  Deep Scan Pipeline (Tier 3)
+  //  Fetches linked pages' HTML via the background service worker,
+  //  parses them safely with DOMParser (no script execution), extracts
+  //  page-level features (forms, iframes, brand impersonation), then
+  //  re-runs the same unified model with deep_scan_ran=1 for a rescore.
   // ================================================================
 
   /**
@@ -2186,6 +2358,9 @@
   
   // ================================================================
   //  User Report Pipeline
+  //  Allows the user to manually flag an email as phishing by selecting
+  //  a severity level. Overrides the ML score with the user's assessment,
+  //  saves the report to storage, and triggers the fish caught animation.
   // ================================================================
 
   const REPORT_SEVERITY = {
@@ -2195,6 +2370,12 @@
     dangerous: { riskScore: 95,  riskLevel: 'Dangerous', fishType: 'shark'      }
   };
 
+  /**
+   * Display a modal dialog for the user to select a phishing severity level.
+   * Presents four options (low, medium, high, dangerous) with fish themes.
+   * Returns a promise that resolves with the selected severity string or null.
+   * @returns {Promise<string|null>} The selected severity ('low'|'medium'|'high'|'dangerous') or null if cancelled.
+   */
   function showReportDialog() {
     return new Promise(resolve => {
       const overlay = document.createElement('div');
@@ -2250,6 +2431,13 @@
     });
   }
 
+  /**
+   * Process a user-submitted phishing report. Updates the risk badge and side panel
+   * to reflect the user-selected severity, saves the report to extension storage,
+   * triggers the fish caught animation, and disables the report button.
+   * @param {string} severity - The severity level chosen by the user ('low'|'medium'|'high'|'dangerous').
+   * @returns {Promise<void>}
+   */
   async function handleReport(severity) {
     const mapping = REPORT_SEVERITY[severity];
     if (!mapping || !lastEmailData) return;
@@ -2313,9 +2501,21 @@
   }
 
   // ================================================================
-  //  UI Display
+  //  UI Display (Side Panel Population)
+  //  Populates the side panel with scan results: risk score, level,
+  //  fish emoji, risk indicator reasons, and suspicious links list.
   // ================================================================
 
+  /**
+   * Populate the side panel UI with scan results. Updates the score display,
+   * risk level label, fish emoji, risk indicator reasons list, and suspicious
+   * links list by filtering email links through URL feature extraction.
+   * @param {Object} prediction - ML inference result with riskScore, riskLevel, reasons[].
+   * @param {Object} emailData - Extracted email data with links[], senderDomain, etc.
+   * @param {string} emailId - Unique email identifier.
+   * @param {Object} fishData - Fish type data with emoji, name, and description.
+   * @returns {void}
+   */
   function displayResults(prediction, emailData, emailId, fishData) {
     updateRiskBadge(prediction.riskLevel, prediction.riskScore, fishData);
     
@@ -2376,8 +2576,16 @@
   
   // ================================================================
   //  Badge Management
+  //  Controls the risk badge displayed on the Gmail email header.
+  //  Handles loading states, deep scan loading, risk level display,
+  //  and restoration after scan completion or cancellation.
   // ================================================================
 
+  /**
+   * Display a loading spinner badge on the email header while the initial scan
+   * is in progress. Removes any existing badge first.
+   * @returns {void}
+   */
   function showLoadingBadge() {
     const existing = document.getElementById('gophishfree-badge');
     if (existing) existing.remove();
@@ -2398,6 +2606,11 @@
     headerArea.parentElement.insertBefore(badge, headerArea.nextSibling);
   }
 
+  /**
+   * Remove the loading badge from the email header, but only if it is still
+   * in the loading state (prevents removing a results badge).
+   * @returns {void}
+   */
   function removeLoadingBadge() {
     const badge = document.getElementById('gophishfree-badge');
     if (badge && badge.classList.contains('gophishfree-loading-badge')) {
@@ -2405,6 +2618,11 @@
     }
   }
 
+  /**
+   * Transition the existing risk badge to a "Deep Scanning..." loading state,
+   * replacing the badge content with a spinner and status text.
+   * @returns {void}
+   */
   function showDeepScanLoadingBadge() {
     const existing = document.getElementById('gophishfree-badge');
     if (!existing) return;
@@ -2417,6 +2635,11 @@
     existing.title = 'Deep scan in progress \u2014 analyzing linked pages';
   }
 
+  /**
+   * Restore the risk badge to its previous state (before deep scan loading).
+   * Uses cached lastPrediction and lastFishData to rebuild the badge.
+   * @returns {void}
+   */
   function restorePreviousBadge() {
     if (lastPrediction && lastFishData) {
       updateRiskBadge(lastPrediction.riskLevel, lastPrediction.riskScore, lastFishData);
@@ -2426,6 +2649,14 @@
     }
   }
 
+  /**
+   * Create or replace the risk badge on the email header with the final scan result.
+   * Displays the fish emoji, name, and risk score. Clicking opens the side panel.
+   * @param {string} riskLevel - Risk level string ('Low'|'Medium'|'High'|'Dangerous').
+   * @param {number} riskScore - Final risk score (0-100).
+   * @param {Object} fishData - Fish type data with emoji, name, and description.
+   * @returns {void}
+   */
   function updateRiskBadge(riskLevel, riskScore, fishData) {
     const existingBadge = document.getElementById('gophishfree-badge');
     if (existingBadge) {
@@ -2456,11 +2687,19 @@
     }
   }
   
+  /**
+   * Open the analysis side panel by adding the 'open' class and showing the overlay.
+   * @returns {void}
+   */
   function openSidePanel() {
     document.getElementById('gophishfree-sidepanel').classList.add('open');
     document.getElementById('gophishfree-overlay').classList.add('show');
   }
   
+  /**
+   * Close the analysis side panel by removing the 'open' class and hiding the overlay.
+   * @returns {void}
+   */
   function closeSidePanel() {
     document.getElementById('gophishfree-sidepanel').classList.remove('open');
     document.getElementById('gophishfree-overlay').classList.remove('show');

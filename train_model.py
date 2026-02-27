@@ -1,23 +1,60 @@
 """
-GoPhishFree - Unified ML Model Training Script
+@file train_model.py
+@description Trains a unified Random Forest classifier on a 64-feature schema
+             covering all analysis tiers (email lexical, DNS, deep scan,
+             BEC/linkless, attachments) plus context flags. Features from
+             tiers that have not run are default-filled with 0; the model
+             learns to score emails with or without those tiers via the
+             dns_ran / deep_scan_ran context flags. Output probabilities are
+             calibrated via isotonic regression so that:
+                 riskScore = round(100 * calibrated_probability)
+             The trained model is exported as a JSON file containing tree
+             structures, scaler parameters, and a calibration lookup table
+             for direct in-browser inference by the Chrome extension.
 
-Trains ONE Random Forest classifier on a unified 64-feature schema that
-covers all tiers (email, DNS, deep scan, BEC/linkless, attachments) plus
-context flags. Features from tiers that have not run are default-filled
-with 0 and the model learns to score emails with or without those tiers
-via dns_ran / deep_scan_ran context flags.
+@programmers Ty Farrington, Andrew Reyes, Brett Suhr, Nicholas Holmes, Kaleb Howard
+@dateCreated 2025-02-01
+@dateRevised 2026-02-14 - Sprint 2 - Added comprehensive comments and documentation (All programmers)
 
-The model's output probability is calibrated (isotonic regression) so that
-    riskScore = round(100 * calibrated_probability)
-replaces the old  prob*80 + rule_points + dns_points  formula.
+@preconditions Python 3.8+ with pandas, numpy, scikit-learn, and joblib installed.
+               The Kaggle phishing dataset CSV must exist at the path
+               'Phishing_Dataset/Phishing_Legitimate_full.csv' relative to
+               the working directory. The CSV must contain columns matching
+               the URL_EMAIL_FEATURES and DEEPSCAN_FEATURES lists, plus a
+               'CLASS_LABEL' column (1 = phishing, 0 = legitimate).
+@acceptableInput A well-formed CSV file with numeric feature columns and a
+                 binary CLASS_LABEL column. No command-line arguments are
+                 required; all configuration is embedded in the script.
+@unacceptableInput Missing or corrupted CSV files; CSVs without the
+                   CLASS_LABEL column; non-numeric feature values; CSV files
+                   with zero rows.
 
-Usage:
-    python train_model.py
+@postconditions The 'model/' directory is created (if absent) and populated
+                with: model_unified.json (tree structures + calibration for
+                JS inference), feature_names.json (ordered 64-feature list),
+                model_calibrated.pkl, model_rf.pkl, and scaler.pkl (sklearn
+                artifacts for future retraining). Training metrics and
+                per-type evaluation are printed to stdout.
+@returnValues None (script entry point). Functions return DataFrames, trained
+              model objects, and calibration arrays as documented below.
 
-Outputs:
-    model/model_unified.json      - Unified model for JS inference
-    model/feature_names.json      - Ordered feature list (64 features)
-    model/*.pkl                   - Sklearn artifacts for retraining
+@errorConditions FileNotFoundError if the CSV path is invalid; ValueError if
+                 CLASS_LABEL is missing; sklearn exceptions if the dataset is
+                 too small for stratified splitting or cross-validation.
+@sideEffects Creates files in the 'model/' directory. Removes __pycache__
+             from the project root (Chrome rejects directories starting
+             with underscore). Prints extensive training diagnostics to
+             stdout.
+@invariants The UNIFIED_FEATURES list always has exactly 64 entries. Feature
+            order is fixed and must match featureExtractor.js's
+            buildUnifiedVector(). Random seeds (42, 77) ensure reproducible
+            training and synthetic data generation.
+@knownFaults Synthetic BEC and attachment samples are generated with
+             heuristic distributions rather than real-world data, which
+             may not perfectly represent actual BEC or attachment-led
+             phishing campaigns. The isotonic calibration lookup table
+             uses 200 evenly spaced points and interpolation gaps may
+             cause minor rounding differences at boundary values.
 """
 import pandas as pd
 import numpy as np
@@ -33,9 +70,20 @@ import os
 # ======================================================================
 # UNIFIED FEATURE SCHEMA (64 features)
 #
-# ORDER MATTERS - featureExtractor.js buildUnifiedVector() must match.
-# When adding features, append to the end of the relevant group and
+# Defines the canonical ordering of all model input features. This
+# ordering is contractual: featureExtractor.js buildUnifiedVector()
+# must produce a vector with features in this exact order. When adding
+# new features, always append to the end of the relevant group and
 # update buildUnifiedVector() in featureExtractor.js to match.
+#
+# The 64 features are organised into 7 logical groups:
+#   Group 1 — URL/Email Lexical   (25 features)
+#   Group 2 — Custom Rule Signals (9 features)
+#   Group 3 — DNS Indicators      (5 features)
+#   Group 4 — Deep Scan Page      (13 features)
+#   Group 5 — BEC / Linkless      (5 features)
+#   Group 6 — Attachment Signals  (5 features)
+#   Group 7 — Context Flags       (2 features)
 # ======================================================================
 
 # Group 1: URL/Email Lexical (25 features)
@@ -103,21 +151,38 @@ UNIFIED_FEATURES = (
 assert len(UNIFIED_FEATURES) == 64, f"Expected 64 features, got {len(UNIFIED_FEATURES)}"
 
 
-# ========================== data preparation ==========================
+# ======================================================================
+# DATA PREPARATION
+# Loads the raw CSV, maps available columns to the unified 64-feature
+# schema, generates data augmentation variants (to teach the model to
+# handle missing tiers), and synthesises BEC / attachment / legitimate
+# newsletter samples to cover attack vectors absent from the URL-only
+# Kaggle dataset.
+# ======================================================================
 
 def load_and_prepare_unified_data(csv_path):
     """
-    Load the Kaggle dataset and build a unified 64-feature DataFrame.
+    Load the Kaggle phishing dataset and build a unified 64-feature DataFrame.
 
     Features available in the CSV are used directly. Features NOT in the
     CSV (BEC, attachment, DNS, custom rules) are default-filled with 0
     and the context flags are set appropriately.
 
     The dataset is augmented with three variants per sample to teach the
-    model to score with and without DNS / deep scan information:
-        Variant A  - base only (dns_ran=0, deep_scan_ran=0)
-        Variant B  - base + simulated DNS (dns_ran=1, deep_scan_ran=0)
-        Variant C  - base + DNS + deepscan features (dns_ran=1, deep_scan_ran=1)
+    model to score correctly with and without DNS / deep scan information:
+        Variant A — base only        (dns_ran=0, deep_scan_ran=0)
+        Variant B — base + sim. DNS  (dns_ran=1, deep_scan_ran=0)
+        Variant C — full features    (dns_ran=1, deep_scan_ran=1)
+
+    Additional synthetic samples for BEC phishing, attachment-led phishing,
+    legitimate newsletters, and legitimate transactional emails are
+    appended to improve coverage of non-URL attack vectors.
+
+    @param csv_path: Filesystem path to the Kaggle CSV dataset.
+    @type csv_path: str
+    @returns: Tuple of (X, y) where X is a DataFrame with 64 feature
+              columns and y is a Series of binary labels (1=phishing, 0=legit).
+    @rtype: tuple[pd.DataFrame, pd.Series]
     """
     df = pd.read_csv(csv_path)
     y_raw = df['CLASS_LABEL']
@@ -167,8 +232,11 @@ def load_and_prepare_unified_data(csv_path):
     unified['dns_ran'] = 0.0
     unified['deep_scan_ran'] = 0.0
 
-    # ==================== Augmentation ====================
-    # Create three variants to teach the model to handle missing tiers
+    # ==================== Data Augmentation ====================
+    # Create three variants of each sample so the model learns to produce
+    # accurate risk scores regardless of which analysis tiers have run.
+    # This prevents the model from relying solely on deep-scan features
+    # that may not be available in a Tier 1 or Tier 2 scan.
 
     # Variant A: base only (dns_ran=0, deep_scan_ran=0)
     # Deep scan features zeroed out so model learns without them
@@ -216,10 +284,11 @@ def load_and_prepare_unified_data(csv_path):
     print(f"\n  URL-based variants: 3 x {n} = {len(X)} samples")
 
     # ==================== Synthetic BEC / Attachment Phishing ====================
-    # The Kaggle dataset is URL-only. We need the model to learn BEC patterns
-    # (financial requests, authority impersonation, phone callbacks, reply-to
-    # mismatch, linkless scams) and attachment-led phishing. We generate
-    # synthetic samples with realistic feature distributions.
+    # The Kaggle dataset only contains URL-based phishing. To make the model
+    # effective against Business Email Compromise (BEC), attachment-led attacks,
+    # and to reduce false positives on legitimate newsletters/transactional
+    # emails, we generate synthetic samples with heuristic feature distributions.
+    # Each synthetic group targets a specific gap in the original dataset.
     # ============================================================================
 
     rng2 = np.random.RandomState(77)
@@ -388,14 +457,30 @@ def load_and_prepare_unified_data(csv_path):
     return X, y
 
 
-# ========================== training ==================================
+# ======================================================================
+# MODEL TRAINING
+# Trains a Random Forest classifier, applies StandardScaler feature
+# normalisation, wraps the model in isotonic calibration for reliable
+# probability estimates, and evaluates via cross-validation.
+# ======================================================================
 
 def train_unified_model(X, y):
     """
-    Train a single Random Forest wrapped with isotonic calibration.
+    Train a single Random Forest classifier wrapped with isotonic calibration.
 
-    Returns the calibrated model, the underlying RF, the scaler, and
-    the test score.
+    Pipeline:
+        1. Stratified 80/20 train-test split
+        2. StandardScaler feature normalisation
+        3. RandomForest training (200 estimators, max_depth=20)
+        4. CalibratedClassifierCV with isotonic regression (5-fold)
+        5. Evaluation: accuracy, cross-validation, classification report
+
+    @param X: Feature matrix with 64 columns matching UNIFIED_FEATURES.
+    @type X: pd.DataFrame
+    @param y: Binary label series (1=phishing, 0=legitimate).
+    @type y: pd.Series
+    @returns: Tuple of (calibrated_model, raw_rf, scaler, test_accuracy).
+    @rtype: tuple[CalibratedClassifierCV, RandomForestClassifier, StandardScaler, float]
     """
     # Split
     X_train, X_test, y_train, y_test = train_test_split(
@@ -455,14 +540,34 @@ def train_unified_model(X, y):
     return calibrated, rf, scaler, cal_test
 
 
-# ========================== calibration export ========================
+# ======================================================================
+# CALIBRATION EXPORT
+# Builds a lookup table mapping raw Random Forest probabilities to
+# isotonic-calibrated probabilities. This table is embedded in the
+# exported JSON model so the browser-side inference engine can apply
+# calibration without needing the full sklearn CalibratedClassifierCV.
+# ======================================================================
 
 def build_calibration_table(calibrated_model, rf, scaler, X, n_points=200):
     """
     Build an isotonic calibration lookup table by sampling the raw RF
-    probability space and mapping through the calibrated model.
+    probability space uniformly and mapping each point through the
+    calibrated model's internal calibrators.
 
-    Returns (x_values, y_values) where x = raw prob, y = calibrated prob.
+    @param calibrated_model: The CalibratedClassifierCV-wrapped model.
+    @type calibrated_model: CalibratedClassifierCV
+    @param rf: The underlying (uncalibrated) RandomForestClassifier.
+    @type rf: RandomForestClassifier
+    @param scaler: The StandardScaler used during training (unused here
+                   but kept for API consistency).
+    @type scaler: StandardScaler
+    @param X: Training data (unused; kept for API consistency).
+    @type X: pd.DataFrame or None
+    @param n_points: Number of evenly spaced points in [0.0, 1.0].
+    @type n_points: int
+    @returns: Tuple of (x_values, y_values) where x = raw probability
+              and y = calibrated probability, both as lists of floats.
+    @rtype: tuple[list[float], list[float]]
     """
     # Generate evenly spaced raw probabilities
     x_raw = np.linspace(0.0, 1.0, n_points)
@@ -490,10 +595,36 @@ def build_calibration_table(calibrated_model, rf, scaler, X, n_points=200):
     return x_raw.tolist(), y_cal
 
 
-# ========================== export ====================================
+# ======================================================================
+# MODEL EXPORT
+# Serialises the trained model in two formats:
+#   1. sklearn pickle files (.pkl) for future retraining in Python
+#   2. A single JSON file containing tree structures, scaler stats, and
+#      calibration lookup table for in-browser inference via JavaScript
+# ======================================================================
 
 def export_unified_model(calibrated, rf, scaler, feature_names, output_dir='model'):
-    """Export the unified model with calibration table for JS inference."""
+    """
+    Export all model artifacts to the output directory.
+
+    Produces:
+        model_calibrated.pkl  — Full CalibratedClassifierCV for Python reuse
+        model_rf.pkl          — Raw RandomForestClassifier
+        scaler.pkl            — Fitted StandardScaler
+        feature_names.json    — Ordered list of 64 feature names
+        model_unified.json    — Combined trees + scaler + calibration for JS
+
+    @param calibrated: Trained CalibratedClassifierCV model.
+    @type calibrated: CalibratedClassifierCV
+    @param rf: Underlying RandomForestClassifier.
+    @type rf: RandomForestClassifier
+    @param scaler: Fitted StandardScaler.
+    @type scaler: StandardScaler
+    @param feature_names: Ordered list of feature name strings.
+    @type feature_names: list[str]
+    @param output_dir: Directory path for output files.
+    @type output_dir: str
+    """
     os.makedirs(output_dir, exist_ok=True)
 
     # Sklearn artifacts
@@ -518,8 +649,27 @@ def export_unified_model(calibrated, rf, scaler, feature_names, output_dir='mode
 
 def export_unified_json(rf, scaler, feature_names, cal_x, cal_y, output_path):
     """
-    Export the Random Forest tree structures plus calibration table
-    to a single JSON file for browser inference.
+    Export the Random Forest tree structures, scaler parameters, feature
+    importances, and isotonic calibration lookup table to a single JSON
+    file for direct browser-side inference in the Chrome extension.
+
+    Each tree is serialised as parallel arrays (feature indices, thresholds,
+    left/right children, leaf values) matching sklearn's internal tree
+    representation. The scaler mean and scale arrays allow the JS engine
+    to normalise feature vectors identically to training.
+
+    @param rf: Trained RandomForestClassifier.
+    @type rf: RandomForestClassifier
+    @param scaler: Fitted StandardScaler with mean_ and scale_ arrays.
+    @type scaler: StandardScaler
+    @param feature_names: Ordered list of 64 feature name strings.
+    @type feature_names: list[str]
+    @param cal_x: Raw probability x-values for calibration lookup.
+    @type cal_x: list[float]
+    @param cal_y: Calibrated probability y-values for calibration lookup.
+    @type cal_y: list[float]
+    @param output_path: Filesystem path for the output JSON file.
+    @type output_path: str
     """
     trees = []
     for estimator in rf.estimators_:
@@ -560,12 +710,35 @@ def export_unified_json(rf, scaler, feature_names, cal_x, cal_y, output_path):
     print(f"  {os.path.basename(output_path)}: {size_mb:.1f} MB  ({len(trees)} trees, {len(feature_names)} features)")
 
 
-# ========================== per-type evaluation =======================
+# ======================================================================
+# PER-TYPE EVALUATION
+# Tags each test sample by inferred phishing style (URL credential,
+# deep-scan impersonation, linkless BEC, attachment-led) based on
+# active feature values, then reports accuracy, precision, recall,
+# and F1 for each group independently.
+# ======================================================================
 
 def evaluate_by_type(calibrated, scaler, X_test, y_test):
     """
-    Heuristic-tag test samples by phishing style and report metrics
-    separately for each type. Uses feature values to infer style.
+    Heuristic-tag test samples by phishing style and report classification
+    metrics separately for each type. Uses feature values to infer which
+    attack vector each sample represents.
+
+    Tags assigned:
+        'linkless_bec'            — No links; BEC-style social engineering
+        'attachment_led'          — Attack vector is an attachment
+        'deepscan_impersonation'  — Deep-scan page features are active
+        'url_credential_phish'    — Standard URL-based credential phishing
+        'other'                   — Does not match any heuristic
+
+    @param calibrated: Trained CalibratedClassifierCV model.
+    @type calibrated: CalibratedClassifierCV
+    @param scaler: Fitted StandardScaler for feature normalisation.
+    @type scaler: StandardScaler
+    @param X_test: Test feature matrix (64 columns).
+    @type X_test: pd.DataFrame
+    @param y_test: True labels for the test set.
+    @type y_test: pd.Series
     """
     X_scaled = scaler.transform(X_test)
     y_pred = calibrated.predict(X_scaled)
@@ -632,9 +805,19 @@ def evaluate_by_type(calibrated, scaler, X_test, y_test):
             print(f"    All {label} - {correct}/{n_samples} correct ({correct/n_samples:.1%})")
 
 
-# ========================== main ======================================
+# ======================================================================
+# MAIN ENTRY POINT
+# Orchestrates the full training pipeline: data loading, model training,
+# artifact export, and per-type evaluation reporting.
+# ======================================================================
 
 def main():
+    """
+    Entry point for the training pipeline. Loads the dataset, trains the
+    unified Random Forest model with isotonic calibration, exports all
+    model artifacts (JSON for browser, pickle for Python), and runs
+    per-type evaluation diagnostics.
+    """
     csv_path = 'Phishing_Dataset/Phishing_Legitimate_full.csv'
 
     print("=" * 60)
@@ -669,7 +852,11 @@ def main():
 
 
 def _clean_pycache():
-    """Remove __pycache__ from project root (Chrome rejects dirs starting with _)."""
+    """
+    Remove __pycache__ directory from the project root. Chrome extension
+    loading rejects directories whose names start with an underscore,
+    so this cleanup prevents load failures during development.
+    """
     import shutil
     base = os.path.dirname(os.path.abspath(__file__))
     pc = os.path.join(base, '__pycache__')

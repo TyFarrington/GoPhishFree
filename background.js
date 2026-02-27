@@ -1,19 +1,55 @@
-// ═══════════════════════════════════════════════════════════════════
-// GoPhishFree – Background Service Worker
-//
-// Handles persistent storage, inter-script messaging, and secure
-// content fetching for the GoPhishFree Chrome extension.
-//
-// Responsibilities:
-//   • Manage scan history and fish collection in chrome.storage.local
-//   • Proxy permission requests from content scripts (MV3 restriction)
-//   • Securely fetch external page HTML for Tier 3 Deep Scan
-//   • Provide fish stats and recent catches to the popup
-// ═══════════════════════════════════════════════════════════════════
+/**
+ * @file background.js
+ * @description Chrome extension background service worker for GoPhishFree.
+ *              Handles persistent storage via chrome.storage.local, inter-script
+ *              message routing between the content script and popup, AI provider
+ *              integration (OpenAI, Anthropic, Google Gemini, Azure OpenAI, Custom),
+ *              secure deep-scan page fetching for Tier 3 analysis, and extension
+ *              lifecycle events such as installation and updates.
+ *
+ * @programmers Ty Farrington, Andrew Reyes, Brett Suhr, Nicholas Holmes, Kaleb Howard
+ * @dateCreated 2025-02-01
+ * @dateRevised 2026-02-14 - Sprint 2 - Added comprehensive comments and documentation (All programmers)
+ *
+ * @preconditions The extension must be loaded as an unpacked or packed Chrome
+ *                extension with a valid manifest.json granting the required
+ *                permissions (storage, activeTab, scripting). The browser must
+ *                support Manifest V3 service workers.
+ * @acceptableInput Chrome runtime messages with an `action` string property and
+ *                  action-specific data fields (e.g., `data`, `url`, `payload`).
+ *                  AI API keys must be valid strings for the chosen provider.
+ * @unacceptableInput Messages missing the `action` field; malformed URLs for
+ *                    fetchPageHTML; non-http/https schemes; API keys that are
+ *                    empty or revoked; payloads exceeding provider token limits.
+ *
+ * @postconditions Scan results are persisted to chrome.storage.local; fish
+ *                 collection counts are updated; AI analysis results are
+ *                 validated against the expected schema before being returned.
+ * @returnValues Each message handler calls `sendResponse()` with an object
+ *               containing `success: boolean` and action-specific data or
+ *               `error: string` on failure.
+ *
+ * @errorConditions Network failures during AI API calls or page fetching;
+ *                  invalid or expired API keys; AI responses that do not
+ *                  conform to the required JSON schema; fetch timeouts
+ *                  (8-second cap); response bodies exceeding 2 MB.
+ * @sideEffects Writes to chrome.storage.local (scan history, fish collection,
+ *              settings). Makes outbound HTTP requests to AI provider APIs
+ *              and to arbitrary URLs during deep-scan page fetching.
+ * @invariants Fish collection keys are always {friendly, suspicious, phishy,
+ *             shark}. Risk scores are integers in [0, 100]. Recent catches
+ *             are capped at 100 entries. AI responses always contain the six
+ *             required fields after validation.
+ * @knownFaults Anthropic and Google Gemini responses may include markdown
+ *              code fences that must be stripped before JSON parsing. The
+ *              custom provider adapter assumes OpenAI-compatible response
+ *              format as a primary fallback.
+ */
 
-// ───────────────────── AI Provider Adapters ─────────────────────
+// ═══════════════════════════════════════════════════════════════════
+// AI PROVIDER ADAPTERS
 //
-// Each adapter transforms the features-only payload into the
+// Each adapter transforms a features-only payload into the specific
 // provider's API format and returns the parsed JSON response.
 // All adapters enforce:
 //   - No tools, no browsing, no link visiting
@@ -21,6 +57,7 @@
 //   - System prompt injection hardening
 //
 // Supported: OpenAI, Anthropic, Google Gemini, Azure OpenAI, Custom
+// ═══════════════════════════════════════════════════════════════════
 
 const AI_SYSTEM_PROMPT = `You are a phishing email risk analyst. You will receive ONLY extracted signal features from an email — never the email body, subject, or sender address.
 
@@ -49,14 +86,27 @@ SCORING GUIDELINES:
 Analyze the signals and respond with ONLY the JSON object.`;
 
 /**
- * Build the user message from the features payload.
+ * Build the user-role message string from the extracted features payload.
+ * The payload is serialised as pretty-printed JSON so the AI model can
+ * parse the signal features for phishing risk analysis.
+ *
+ * @param {Object} payload - Extracted email signal features (key-value pairs).
+ * @returns {string} Formatted prompt string for the AI user message.
  */
 function buildAiUserMessage(payload) {
   return `Analyze these email signals for phishing risk:\n\n${JSON.stringify(payload, null, 2)}`;
 }
 
 /**
- * Provider: OpenAI (GPT-4o-mini or similar)
+ * Provider adapter for OpenAI (GPT-4o-mini or similar).
+ * Sends a chat completion request with system + user messages and
+ * enforces JSON output via the `response_format` parameter.
+ *
+ * @param {string} apiKey - OpenAI API key (Bearer token).
+ * @param {Object} payload - Extracted email signal features.
+ * @param {string} [modelName] - Model identifier; defaults to 'gpt-4o-mini'.
+ * @returns {Promise<Object>} Parsed JSON object from the AI response.
+ * @throws {Error} On non-OK HTTP status or empty response body.
  */
 async function callOpenAI(apiKey, payload, modelName) {
   const model = modelName || 'gpt-4o-mini';
@@ -90,7 +140,16 @@ async function callOpenAI(apiKey, payload, modelName) {
 }
 
 /**
- * Provider: Anthropic (Claude)
+ * Provider adapter for Anthropic (Claude).
+ * Uses the Anthropic Messages API with a separate system prompt field.
+ * Requires the `anthropic-dangerous-direct-browser-access` header for
+ * browser-based calls. Strips markdown code fences from the response.
+ *
+ * @param {string} apiKey - Anthropic API key (x-api-key header).
+ * @param {Object} payload - Extracted email signal features.
+ * @param {string} [modelName] - Model identifier; defaults to 'claude-sonnet-4-20250514'.
+ * @returns {Promise<Object>} Parsed JSON object from the AI response.
+ * @throws {Error} On non-OK HTTP status or empty response body.
  */
 async function callAnthropic(apiKey, payload, modelName) {
   const model = modelName || 'claude-sonnet-4-20250514';
@@ -128,7 +187,16 @@ async function callAnthropic(apiKey, payload, modelName) {
 }
 
 /**
- * Provider: Google Gemini
+ * Provider adapter for Google Gemini.
+ * Uses the Generative Language API with the API key passed as a query
+ * parameter. System and user prompts are concatenated into a single
+ * content part. Enforces JSON via `responseMimeType`.
+ *
+ * @param {string} apiKey - Google API key (query parameter).
+ * @param {Object} payload - Extracted email signal features.
+ * @param {string} [modelName] - Model identifier; defaults to 'gemini-2.0-flash'.
+ * @returns {Promise<Object>} Parsed JSON object from the AI response.
+ * @throws {Error} On non-OK HTTP status or empty response body.
  */
 async function callGoogle(apiKey, payload, modelName) {
   const model = modelName || 'gemini-2.0-flash';
@@ -167,7 +235,17 @@ async function callGoogle(apiKey, payload, modelName) {
 }
 
 /**
- * Provider: Azure OpenAI
+ * Provider adapter for Azure OpenAI.
+ * Sends a chat completion request to an Azure-hosted OpenAI deployment.
+ * The endpoint URL must include the deployment path; the api-version
+ * query parameter is appended automatically if not already present.
+ *
+ * @param {string} apiKey - Azure OpenAI API key (api-key header).
+ * @param {Object} payload - Extracted email signal features.
+ * @param {string} endpointUrl - Full Azure deployment endpoint URL.
+ * @param {string} [modelName] - Unused for Azure (deployment determines model).
+ * @returns {Promise<Object>} Parsed JSON object from the AI response.
+ * @throws {Error} If endpointUrl is missing, on non-OK HTTP status, or empty response.
  */
 async function callAzureOpenAI(apiKey, payload, endpointUrl, modelName) {
   if (!endpointUrl) throw new Error('Azure OpenAI requires an endpoint URL');
@@ -206,7 +284,17 @@ async function callAzureOpenAI(apiKey, payload, endpointUrl, modelName) {
 }
 
 /**
- * Provider: Custom endpoint (OpenAI-compatible API)
+ * Provider adapter for a custom OpenAI-compatible endpoint.
+ * Sends a standard chat completion request using Bearer auth. Tries
+ * multiple response formats (OpenAI, Anthropic, generic) to extract
+ * the AI's text content.
+ *
+ * @param {string} apiKey - API key for the custom endpoint (Bearer token).
+ * @param {Object} payload - Extracted email signal features.
+ * @param {string} endpointUrl - Full URL of the custom chat completions endpoint.
+ * @param {string} [modelName] - Model identifier; defaults to 'default'.
+ * @returns {Promise<Object>} Parsed JSON object from the AI response.
+ * @throws {Error} If endpointUrl is missing, on non-OK HTTP status, or empty response.
  */
 async function callCustom(apiKey, payload, endpointUrl, modelName) {
   if (!endpointUrl) throw new Error('Custom provider requires an endpoint URL');
@@ -249,7 +337,16 @@ async function callCustom(apiKey, payload, endpointUrl, modelName) {
 }
 
 /**
- * Route to the correct provider adapter.
+ * Route an AI analysis request to the correct provider adapter based on
+ * the user's configured provider setting.
+ *
+ * @param {string} provider - Provider key: 'openai' | 'anthropic' | 'google' | 'azure' | 'custom'.
+ * @param {string} apiKey - API key for the selected provider.
+ * @param {Object} payload - Extracted email signal features to analyse.
+ * @param {string} [endpointUrl] - Endpoint URL (required for 'azure' and 'custom').
+ * @param {string} [modelName] - Optional model override for the provider.
+ * @returns {Promise<Object>} Parsed AI response object.
+ * @throws {Error} If the provider key is unrecognised.
  */
 async function runAiProvider(provider, apiKey, payload, endpointUrl, modelName) {
   switch (provider) {
@@ -263,7 +360,14 @@ async function runAiProvider(provider, apiKey, payload, endpointUrl, modelName) 
 }
 
 /**
- * Validate AI response matches required schema.
+ * Validate that an AI response object conforms to the required schema.
+ * Checks for the presence of all six required fields, validates types
+ * and value ranges, and normalises the output (rounding scores, capping
+ * array lengths, truncating notes).
+ *
+ * @param {Object} result - Raw parsed JSON from an AI provider response.
+ * @returns {Object|null} Validated and normalised response object, or null
+ *                        if the response is missing fields or has invalid types.
  */
 function validateAiResponse(result) {
   if (!result || typeof result !== 'object') return null;
@@ -291,15 +395,23 @@ function validateAiResponse(result) {
   };
 }
 
-// ───────────────────── Risk Classification ─────────────────────
+// ═══════════════════════════════════════════════════════════════════
+// RISK CLASSIFICATION
+// Maps numeric risk scores to gamified fish-type categories used
+// throughout the extension's UI (popup fish tank, badge counts).
+// ═══════════════════════════════════════════════════════════════════
 
 /**
- * Map a numeric risk score to a fish type key.
+ * Map a numeric risk score (0-100) to one of four fish-type category keys.
+ *
  * Thresholds:
- *   90-100  → shark      (Dangerous)
- *   76-89   → phishy     (High Risk)
- *   50-75   → suspicious (Medium Risk)
- *   0-49    → friendly   (Low Risk)
+ *   90-100  → 'shark'      (Dangerous)
+ *   76-89   → 'phishy'     (High Risk)
+ *   50-75   → 'suspicious' (Medium Risk)
+ *    0-49   → 'friendly'   (Low Risk)
+ *
+ * @param {number} riskScore - Integer risk score in the range [0, 100].
+ * @returns {string} Fish type key: 'shark' | 'phishy' | 'suspicious' | 'friendly'.
  */
 function getFishTypeFromRisk(riskScore) {
   if (riskScore >= 90) return 'shark';
@@ -308,11 +420,17 @@ function getFishTypeFromRisk(riskScore) {
   return 'friendly';
 }
 
-// ───────────────────── Extension Install ───────────────────────
+// ═══════════════════════════════════════════════════════════════════
+// EXTENSION LIFECYCLE — INSTALL / UPDATE
+// Sets default values in chrome.storage.local on first install or
+// version update, ensuring all expected keys exist for downstream
+// consumers (popup, content script).
+// ═══════════════════════════════════════════════════════════════════
 
 /**
  * Initialise default storage values when the extension is first
- * installed or updated. This ensures all expected keys exist.
+ * installed or updated. This ensures all expected keys exist so that
+ * the popup and content script never encounter undefined values.
  */
 chrome.runtime.onInstalled.addListener(() => {
   console.log('GoPhishFree extension installed');
@@ -337,20 +455,32 @@ chrome.runtime.onInstalled.addListener(() => {
   });
 });
 
-// ───────────────────── Message Router ──────────────────────────
+// ═══════════════════════════════════════════════════════════════════
+// MESSAGE ROUTER
+// Central message handler for all inter-script communication.
+// Content script and popup send messages via chrome.runtime.sendMessage()
+// and this listener dispatches to the appropriate handler.
+//
+// Supported actions:
+//   saveScanResult      – persist a scan and update fish collection
+//   getScanHistory      – return full scan history (legacy)
+//   getFishCollection   – return fish counts for the popup tank
+//   clearHistory        – reset all scan data
+//   requestPermissions  – proxy chrome.permissions.request (Tier 3)
+//   fetchPageHTML       – securely fetch external page HTML (Tier 3)
+//   runAiAnalysis       – route features through configured AI provider
+//   getFishStats        – return detailed fish statistics
+// ═══════════════════════════════════════════════════════════════════
 
 /**
- * Central message handler. Content script and popup communicate
- * with the background via chrome.runtime.sendMessage().
+ * Central asynchronous message listener. Each action handler returns
+ * `true` to keep the sendResponse channel open for async chrome.storage
+ * or fetch operations.
  *
- * Supported actions:
- *   saveScanResult      – persist a scan and update fish collection
- *   getScanHistory      – return full scan history (legacy)
- *   getFishCollection   – return fish counts for the popup tank
- *   clearHistory        – reset all scan data
- *   requestPermissions  – proxy chrome.permissions.request (Tier 3)
- *   fetchPageHTML       – securely fetch external page HTML (Tier 3)
- *   getFishStats        – return detailed fish statistics
+ * @param {Object} request - Message object with `action` string and action-specific data.
+ * @param {Object} sender - Chrome runtime sender metadata (tab info, URL, etc.).
+ * @param {Function} sendResponse - Callback to return a response to the caller.
+ * @returns {boolean} Always returns `true` for handled actions (async response).
  */
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   

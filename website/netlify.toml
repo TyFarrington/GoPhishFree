@@ -1,0 +1,32 @@
+# =============================================================================
+# @file netlify.toml
+# @description Netlify deployment configuration for the GoPhishFree landing page.
+#              Specifies the build command, the publish directory for the compiled
+#              output, and a catch-all redirect rule that enables client-side (SPA)
+#              routing by forwarding all paths to index.html.
+#
+# @programmers Ty Farrington, Andrew Reyes, Brett Suhr, Nicholas Holmes, Kaleb Howard
+# @dateCreated 2026-02-14
+# @dateRevised 2026-02-14 - Sprint 2: Initial website creation with comprehensive documentation (All programmers)
+#
+# @preconditions The project must contain a valid package.json with a "build" script.
+#                Netlify CLI or Netlify CI must be configured to deploy this repository.
+# @postconditions The site is built into the dist/ directory and served with SPA routing.
+# @errorConditions If "npm run build" fails, the Netlify deploy will be marked as failed.
+# @sideEffects None (configuration only).
+# @invariants The publish directory is always "dist" (Vite's default output).
+# @knownFaults None.
+# =============================================================================
+
+# ---- Build Settings ----
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+# ---- SPA Redirect Rule ----
+# All unmatched routes are rewritten to index.html so React Router (or hash-based
+# navigation) can handle client-side routing.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

@@ -1,15 +1,58 @@
+<!--
+  @file popup.html
+  @description Chrome extension popup UI (Fish Tank Dashboard) for GoPhishFree. Provides
+               a gamified visualization of phishing detection results through an animated
+               aquarium metaphor. Contains embedded CSS styles for the entire popup UI,
+               a header with logo and scan statistics, an animated fish tank with SVG
+               decorations (seaweed, coral, sand floor, treasure chest, starfish, pebbles,
+               caustic light effects), a fish collection panel showing 4 fish types
+               (Friendly, Suspicious, Phishy, Mega Phish) with locked/unlocked states,
+               a recent catches list with clickable items that navigate to Gmail, a settings
+               panel (Enhanced Scanning DNS toggle, AI Enhancement toggle, trusted domains
+               manager), and an AI configuration modal for provider/API key setup.
+
+  @programmers Ty Farrington, Andrew Reyes, Brett Suhr, Nicholas Holmes, Kaleb Howard
+  @dateCreated 2025-02-01
+  @dateRevised 2026-02-14 - Sprint 2: Added comprehensive comments and documentation (All programmers)
+
+  @preconditions Must be loaded as a Chrome extension popup (chrome-extension:// context).
+                 The popup.js script must be available for loading. The Assets/logomini.png
+                 image must exist. Google Fonts CDN must be reachable for Fredoka One and
+                 Quicksand font families. chrome.storage and chrome.runtime APIs must be
+                 available.
+  @acceptableInput User interactions: clicking stat pills (hover tooltips), clicking fish
+                   entities (tooltip display), clicking recent catch items (navigates to
+                   Gmail), toggling settings checkboxes, adding/removing trusted domains,
+                   configuring AI provider via modal, clearing history via Clear All button.
+  @unacceptableInput This file does not accept programmatic input. All data flows through
+                     popup.js which communicates with background.js via chrome.runtime messages.
+
+  @postconditions The popup displays current scan statistics, animated fish representing
+                  detected phishing emails, recent catch history, and user-configurable settings.
+  @returnValues N/A (HTML document rendered by browser).
+
+  @errorConditions If popup.js fails to load, the tank remains in empty state. If
+                   chrome.storage is unavailable, settings and stats show defaults.
+                   If font CDN is unreachable, browser falls back to system sans-serif.
+  @sideEffects Loads popup.js which communicates with the extension background service worker.
+               Loads external fonts from Google Fonts CDN.
+  @invariants Popup width is fixed at 420px. Fish tank height is 300px. The HTML structure
+              must not be modified without corresponding updates to popup.js DOM queries.
+  @knownFaults Font loading may cause a brief flash of unstyled text (FOUT) on slow
+               connections. The 420px fixed width does not adapt to different popup sizes.
+-->
 <!DOCTYPE html>
 <!--
   GoPhishFree – Fish Tank Dashboard (popup.html)
 
   This is the extension popup UI shown when clicking the toolbar icon.
   Contains:
-    • Header with logomini.png icon, title, and stat pills (with hover tooltips)
-    • Animated fish tank with SVG decorations (sand, seaweed, coral, etc.)
-    • Fish collection panel (4 types with locked/unlocked states)
-    • Recent catches list with clickable items
-    • Enhanced Scanning settings toggle
-    • Fish tooltip overlay
+    - Header with logomini.png icon, title, and stat pills (with hover tooltips)
+    - Animated fish tank with SVG decorations (sand, seaweed, coral, etc.)
+    - Fish collection panel (4 types with locked/unlocked states)
+    - Recent catches list with clickable items
+    - Enhanced Scanning settings toggle
+    - Fish tooltip overlay
 
   Styles are embedded for popup performance (single file load).
   Fish animation logic lives in popup.js.
@@ -20,7 +63,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>GoPhishFree - Fish Tank</title>
   <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- ═══ Embedded Stylesheet ═══
+       All CSS is embedded inline for popup performance (single file load).
+       Sections: Reset, Header, Fish Tank & Water Effects, Bubbles,
+       Sand Floor, Seaweed, Coral, Treasure Chest, Pebbles, Starfish,
+       Caustics & Particles, Fish Entities & Animations, Collection Panel,
+       Recent Catches, Settings Panel, AI Modal, Scrollbar, Tooltip. -->
   <style>
+    /* ─── CSS Reset ─── */
     * {
       margin: 0;
       padding: 0;
@@ -1277,6 +1327,9 @@
   </style>
 </head>
 <body>
+  <!-- ═══ SECTION: Header ═══
+       Contains logo image, app title, and stat pill badges showing
+       total emails scanned and total fish caught with hover tooltips. -->
   <div class="header">
     <div class="header-left">
       <span class="logo-icon"><img src="Assets/logomini.png" alt="GoPhishFree"></span>
@@ -1296,6 +1349,11 @@
     </div>
   </div>
   
+  <!-- ═══ SECTION: Fish Tank ═══
+       The main animated aquarium container. Contains layered visual effects
+       (caustic lights, light rays, water surface), bubble and particle
+       containers, the fish swimming area, SVG sand floor, seaweed clusters,
+       coral decorations, pebbles, starfish, treasure chest, and a shell. -->
   <div class="fish-tank" id="fish-tank">
     <!-- Caustic light pattern -->
     <div class="caustics"></div>
@@ -1480,6 +1538,10 @@
 
   </div>
   
+  <!-- ═══ SECTION: Fish Collection Panel ═══
+       Displays the 4 fish types (Friendly, Suspicious, Phishy, Mega Phish)
+       in a grid with SVG icons, counts, and locked/unlocked states.
+       Icons are populated dynamically by popup.js initCollectionIcons(). -->
   <div class="collection-panel">
     <div class="collection-header">
       <div class="collection-title">
@@ -1512,6 +1574,10 @@
     </div>
   </div>
   
+  <!-- ═══ SECTION: Recent Catches List ═══
+       Shows the most recent phishing detections with fish emoji, sender domain,
+       timestamp, and risk score badge. Items are clickable to navigate to the
+       email in Gmail. Populated by popup.js displayRecentCatches(). -->
   <div class="recent-section">
     <div class="section-header">
       <span class="section-title">Recent Catches</span>
@@ -1522,6 +1588,10 @@
     </div>
   </div>
   
+  <!-- ═══ SECTION: Settings Panel ═══
+       Contains toggle switches for Enhanced Scanning (Tier 2 DNS checks via
+       Cloudflare DoH) and AI Enhancement (bring-your-own-key LLM integration).
+       Also includes the Trusted Domains manager for adding/blocking domains. -->
   <div class="settings-panel">
     <div class="settings-header">
       <span class="settings-title">Settings</span>
@@ -1568,7 +1638,11 @@
     </div>
   </div>
 
-  <!-- AI Configuration Modal -->
+  <!-- ═══ SECTION: AI Configuration Modal ═══
+       Full-screen overlay modal for configuring the AI provider (OpenAI,
+       Anthropic, Google, Azure, or Custom). Contains provider selector,
+       API key input, custom endpoint/model fields, and save/cancel buttons.
+       API keys are stored locally only and never synced. -->
   <div class="ai-modal-overlay" id="ai-modal-overlay">
     <div class="ai-modal">
       <div class="ai-modal-header">
@@ -1609,6 +1683,9 @@
     </div>
   </div>
 
+  <!-- ═══ SECTION: Fish Tooltip Overlay ═══
+       Floating tooltip displayed on fish hover, showing the fish type name
+       and description. Positioned dynamically by popup.js showFishTooltip(). -->
   <div class="fish-tooltip" id="fish-tooltip">
     <div class="tooltip-title"></div>
     <div class="tooltip-detail"></div>

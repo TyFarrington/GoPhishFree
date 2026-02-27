@@ -1,18 +1,54 @@
-// ═══════════════════════════════════════════════════════════════════
-// GoPhishFree – Fish Tank Dashboard (popup.js)
-//
-// Controls the animated fish tank popup and dashboard:
-//   • SVG fish generators (Friendly, Suspicious, Phishy Puffer, Shark)
-//   • FishEntity class with JS-driven swimming + CSS micro-animations
-//   • requestAnimationFrame loop for smooth movement
-//   • Fish collection panel with counts and locked/unlocked states
-//   • Recent catches list with clickable items
-//   • Bubble, particle, and caustic light effects
-//   • Enhanced Scanning toggle (Tier 2 DNS checks)
-//
-// Fish face RIGHT by default; scaleX(-1) flips them when swimming left.
-// Tail flutter, fin wave, and eye blink are CSS-driven for efficiency.
-// ═══════════════════════════════════════════════════════════════════
+/**
+ * @file popup.js
+ * @description JavaScript controller for the GoPhishFree Fish Tank popup dashboard.
+ *              Handles SVG fish generation (4 types: Friendly, Suspicious, Phishy Puffer,
+ *              Shark), JS-driven fish swimming animation via requestAnimationFrame, CSS
+ *              micro-animations (tail flutter, fin wave, eye blink, pufferfish puff/depuff),
+ *              bubble and particle visual effects, fish collection panel with counts and
+ *              locked/unlocked states, recent catches display with Gmail navigation, settings
+ *              management (Enhanced Scanning toggle, AI Enhancement toggle), trusted domains
+ *              manager, and AI provider configuration modal.
+ *
+ * @programmers Ty Farrington, Andrew Reyes, Brett Suhr, Nicholas Holmes, Kaleb Howard
+ * @dateCreated 2025-02-01
+ * @dateRevised 2026-02-14 - Sprint 2: Added comprehensive comments and documentation (All programmers)
+ *
+ * @preconditions Must be loaded within the Chrome extension popup context (popup.html).
+ *                The chrome.storage, chrome.runtime, and chrome.tabs APIs must be available.
+ *                The popup.html DOM must contain all expected element IDs (fish-tank,
+ *                fish-container, bubbles, particles, fish-types, recent-list, etc.).
+ *                The background service worker must respond to 'getFishCollection' and
+ *                'clearHistory' messages.
+ * @acceptableInput Fish collection data from chrome.runtime messages: { fishCollection: Object,
+ *                  totalScanned: number, recentCatches: Array }. Risk scores 0-100 for fish
+ *                  type classification. Settings stored in chrome.storage.local.
+ * @unacceptableInput Risk scores outside 0-100 range. Missing or null DOM elements for
+ *                    required containers. Invalid chrome.storage data shapes.
+ *
+ * @postconditions The fish tank displays animated SVG fish corresponding to detected phishing
+ *                 emails. Statistics, collection counts, and recent catches are rendered.
+ *                 User settings are persisted to chrome.storage.local.
+ * @returnValues Functions are side-effect driven (DOM manipulation). getFishTypeFromRisk()
+ *               returns a fish type string. formatTime() returns a human-readable time string.
+ *               escapeHtml() returns a sanitized HTML string.
+ *
+ * @errorConditions chrome.runtime.lastError during message passing logs to console and aborts.
+ *                  Missing DOM elements cause early returns via null checks. Animation frame
+ *                  delta-time is capped at 0.1s to prevent jumps on tab-switch.
+ * @sideEffects Communicates with background.js via chrome.runtime.sendMessage(). Reads/writes
+ *              chrome.storage.local for settings (enhancedScanning, aiEnhanceEnabled, aiProvider,
+ *              aiApiKey, customTrustedDomains, customBlockedDomains). Opens new tabs via
+ *              chrome.tabs.create() when recent catch items are clicked. Manipulates the DOM
+ *              extensively via createElement, innerHTML, classList, and style properties.
+ * @invariants Fish face RIGHT in their SVG definitions; scaleX(-1) flips them when swimming
+ *             left. The animation loop runs at the browser's native refresh rate. A maximum
+ *             of 12 fish are visible in the tank at any time. Tail flutter, fin wave, and
+ *             eye blink animations are CSS-driven for GPU efficiency.
+ * @knownFaults Fish container bounds are read once at spawn time and do not update on resize.
+ *              The pufferfish puff animation uses setTimeout chains that may drift over time.
+ *              Bubble and particle elements accumulate if the popup stays open for extended
+ *              periods (mitigated by setTimeout removal).
+ */
 
 /* ═══════════════════════════════════════════════
    Fish Type Configuration
@@ -77,8 +113,11 @@ let spawnTimeouts = [];
    CSS handles micro-animations (tail, fin, blink).
    ═══════════════════════════════════════════════ */
 
+/**
+ * Generate the SVG markup for a Friendly Fish (blue tropical fish).
+ * @returns {string} SVG markup string for the friendly fish type.
+ */
 function createFriendlyFishSVG() {
-  // Cute blue tropical fish
   return `<svg class="fish-svg" viewBox="0 0 48 30" xmlns="http://www.w3.org/2000/svg">
     <g class="fish-tail">
       <polygon points="3,15 0,6 10,12" fill="#0277bd"/>
@@ -98,8 +137,11 @@ function createFriendlyFishSVG() {
   </svg>`;
 }
 
+/**
+ * Generate the SVG markup for a Suspicious Fish (orange angelfish with stripes).
+ * @returns {string} SVG markup string for the suspicious fish type.
+ */
 function createSuspiciousFishSVG() {
-  // Tall orange angelfish with dorsal + anal fins and stripes
   return `<svg class="fish-svg" viewBox="0 0 46 40" xmlns="http://www.w3.org/2000/svg">
     <g class="fish-tail">
       <polygon points="5,20 0,13 9,17" fill="#e65100"/>
@@ -122,8 +164,12 @@ function createSuspiciousFishSVG() {
   </svg>`;
 }
 
+/**
+ * Generate the SVG markup for a Phishy Puffer (yellow-brown pufferfish with spots and spines).
+ * Spines are hidden by default and revealed via CSS when the fish "puffs up".
+ * @returns {string} SVG markup string for the phishy puffer fish type.
+ */
 function createPhishyPufferSVG() {
-  // Detailed pufferfish — yellow-brown with spots, lips, brownish spines
   return `<svg class="fish-svg" viewBox="0 0 48 44" xmlns="http://www.w3.org/2000/svg">
     <!-- Tail -->
     <g class="fish-tail">
@@ -196,8 +242,11 @@ function createPhishyPufferSVG() {
   </svg>`;
 }
 
+/**
+ * Generate the SVG markup for a Mega Phish Shark (detailed shark with dorsal fin and teeth).
+ * @returns {string} SVG markup string for the shark fish type.
+ */
 function createSharkSVG() {
-  // Shark — fat head, razor taper to pencil-thin peduncle, BIG bold tail
   return `<svg class="fish-svg" viewBox="0 0 90 48" xmlns="http://www.w3.org/2000/svg">
 
     <!-- ══ TAIL — thick, bold, impossible to miss ══ -->
@@ -315,6 +364,11 @@ function createSharkSVG() {
   </svg>`;
 }
 
+/**
+ * Get the SVG markup for a given fish type by delegating to the appropriate generator.
+ * @param {string} type - The fish type key ('friendly', 'suspicious', 'phishy', or 'shark').
+ * @returns {string} SVG markup string for the specified fish type.
+ */
 function getFishSVG(type) {
   const generators = {
     friendly:   createFriendlyFishSVG,
@@ -330,6 +384,12 @@ function getFishSVG(type) {
    ═══════════════════════════════════════════════ */
 
 class FishEntity {
+  /**
+   * Create a new fish entity with randomized position, velocity, and scale.
+   * Appends a DOM element to the container and starts CSS micro-animations.
+   * @param {string} type - The fish type key ('friendly', 'suspicious', 'phishy', or 'shark').
+   * @param {HTMLElement} container - The DOM container element to append the fish to.
+   */
   constructor(type, container) {
     this.type = type;
     const cfg = FISH_TYPES[type];
@@ -385,7 +445,11 @@ class FishEntity {
     this.el.addEventListener('mouseleave', hideFishTooltip);
   }
 
-  /* offset CSS animations so fish don't all flutter in sync */
+  /**
+   * Offset CSS animation start times so fish don't all flutter in sync.
+   * Randomizes tail, pectoral fin, and eyelid animation delays.
+   * @returns {void}
+   */
   _randomizeAnimations() {
     const tail = this.el.querySelector('.fish-tail');
     const pect = this.el.querySelector('.fish-pectoral');
@@ -395,7 +459,12 @@ class FishEntity {
     if (lid)  lid.style.animationDelay  = `${-Math.random() * 5}s`;
   }
 
-  /* Pufferfish: periodically puff up then deflate */
+  /**
+   * Schedule a pufferfish puff/depuff cycle. The fish inflates (slowing down),
+   * holds for 2.5 seconds, then deflates and restores normal speed.
+   * Only applies to 'phishy' type fish.
+   * @returns {void}
+   */
   _schedulePuff() {
     const delay = 7000 + Math.random() * 10000;
     this._puffTimeout = setTimeout(() => {
@@ -415,7 +484,13 @@ class FishEntity {
     }, delay);
   }
 
-  /* Called every frame by the animation loop */
+  /**
+   * Update the fish position and transform for one animation frame.
+   * Handles course changes, velocity clamping, wall bouncing, facing
+   * direction smoothing, swim-angle tilt, and DOM style application.
+   * @param {number} dt - Delta time in seconds since the last frame (capped at 0.1s).
+   * @returns {void}
+   */
   update(dt) {
     dt = Math.min(dt, 0.1);   // cap to prevent jump on tab-switch
 
@@ -466,6 +541,10 @@ class FishEntity {
       `scaleX(${this.currentScaleX}) rotate(${swimAngle.toFixed(1)}deg) scale(${this.scale})`;
   }
 
+  /**
+   * Remove the fish entity from the DOM and clear any pending timeouts.
+   * @returns {void}
+   */
   destroy() {
     if (this._puffTimeout) clearTimeout(this._puffTimeout);
     this.el.remove();
@@ -476,6 +555,11 @@ class FishEntity {
    Animation Loop (requestAnimationFrame)
    ═══════════════════════════════════════════════ */
 
+/**
+ * Start the requestAnimationFrame animation loop for all fish entities.
+ * No-ops if the loop is already running.
+ * @returns {void}
+ */
 function startAnimation() {
   if (animFrameId) return;
   lastFrameTime = performance.now();
@@ -489,6 +573,10 @@ function startAnimation() {
   animFrameId = requestAnimationFrame(tick);
 }
 
+/**
+ * Stop the requestAnimationFrame animation loop.
+ * @returns {void}
+ */
 function stopAnimation() {
   if (animFrameId) {
     cancelAnimationFrame(animFrameId);
@@ -518,6 +606,11 @@ document.addEventListener('DOMContentLoaded', () => {
    Collection Panel Icons (SVG instead of emoji)
    ═══════════════════════════════════════════════ */
 
+/**
+ * Initialize the fish collection panel icons by injecting SVG fish
+ * markup into each fish-type-icon element based on its data-fish-type attribute.
+ * @returns {void}
+ */
 function initCollectionIcons() {
   document.querySelectorAll('.fish-type-icon[data-fish-type]').forEach(el => {
     const type = el.dataset.fishType;
@@ -531,6 +624,12 @@ function initCollectionIcons() {
    Settings (Enhanced Scanning toggle)
    ═══════════════════════════════════════════════ */
 
+/**
+ * Initialize the settings panel: Enhanced Scanning toggle, AI Enhancement
+ * toggle, AI status pill, and AI configuration button/modal.
+ * Loads current settings from chrome.storage.local and attaches event listeners.
+ * @returns {void}
+ */
 function initSettings() {
   // ── Enhanced Scanning toggle ──
   const toggle = document.getElementById('enhanced-scanning-toggle');
@@ -594,6 +693,12 @@ function initSettings() {
   initAiModal();
 }
 
+/**
+ * Initialize the AI configuration modal: attach event listeners for provider
+ * selection, close/cancel buttons, overlay click-to-close, and save handler
+ * that persists AI settings to chrome.storage.local.
+ * @returns {void}
+ */
 function initAiModal() {
   const overlay       = document.getElementById('ai-modal-overlay');
   const closeBtn      = document.getElementById('ai-modal-close');
@@ -676,6 +781,10 @@ function initAiModal() {
   }
 }
 
+/**
+ * Open the AI configuration modal, pre-populating fields with current saved settings.
+ * @returns {void}
+ */
 function openAiModal() {
   const overlay = document.getElementById('ai-modal-overlay');
   if (!overlay) return;
@@ -704,6 +813,10 @@ function openAiModal() {
   overlay.classList.add('show');
 }
 
+/**
+ * Close the AI configuration modal by removing the 'show' class from the overlay.
+ * @returns {void}
+ */
 function closeAiModal() {
   const overlay = document.getElementById('ai-modal-overlay');
   if (overlay) overlay.classList.remove('show');
@@ -713,6 +826,12 @@ function closeAiModal() {
    Bubble Effect
    ═══════════════════════════════════════════════ */
 
+/**
+ * Initialize the bubble visual effect. Creates bubble DOM elements at random
+ * positions that rise from the tank floor with CSS animation, then self-remove.
+ * Spawns a new bubble every 1 second with 4 initial bubbles staggered on load.
+ * @returns {void}
+ */
 function initBubbles() {
   const container = document.getElementById('bubbles');
 
@@ -737,6 +856,12 @@ function initBubbles() {
    Floating Particles (tiny plankton / dust motes)
    ═══════════════════════════════════════════════ */
 
+/**
+ * Initialize floating particle effects (tiny plankton / dust motes). Creates
+ * small translucent dots that drift upward through the tank with random sizing,
+ * positioning, and color. Spawns every 2.5 seconds with 6 initial particles.
+ * @returns {void}
+ */
 function initParticles() {
   const container = document.getElementById('particles');
   if (!container) return;
@@ -766,6 +891,12 @@ function initParticles() {
    Fish Tank Data Loading
    ═══════════════════════════════════════════════ */
 
+/**
+ * Load fish tank data from the background service worker via chrome.runtime message.
+ * Updates statistics, fish type counts, populates the tank, and displays recent catches.
+ * Called on initial load and refreshed every 30 seconds.
+ * @returns {void}
+ */
 function loadFishTank() {
   chrome.runtime.sendMessage({ action: 'getFishCollection' }, (response) => {
     if (chrome.runtime.lastError) {
@@ -791,6 +922,12 @@ function loadFishTank() {
    Collection Panel
    ═══════════════════════════════════════════════ */
 
+/**
+ * Update the fish collection panel with current counts and locked/unlocked states.
+ * A type is "unlocked" when its count is greater than zero.
+ * @param {Object} collection - Object mapping fish type keys to their counts.
+ * @returns {void}
+ */
 function updateFishTypeCounts(collection) {
   let typesCollected = 0;
 
@@ -815,6 +952,13 @@ function updateFishTypeCounts(collection) {
    Populate Fish Tank (SVG fish with JS movement)
    ═══════════════════════════════════════════════ */
 
+/**
+ * Populate the fish tank with SVG fish entities based on the current collection.
+ * Clears existing fish, builds a list from collection counts (up to 3 per type,
+ * max 12 total), shuffles, and spawns with staggered timing for natural entrance.
+ * @param {Object} collection - Object mapping fish type keys to their counts.
+ * @returns {void}
+ */
 function populateFishTank(collection) {
   const container = document.getElementById('fish-container');
   const emptyTank = document.getElementById('empty-tank');
@@ -864,6 +1008,13 @@ function populateFishTank(collection) {
    Fish Tooltip
    ═══════════════════════════════════════════════ */
 
+/**
+ * Show a tooltip above (or below) a fish entity displaying its name and description.
+ * Positions the tooltip centered on the fish, clamped within popup bounds.
+ * @param {MouseEvent} e - The mouseenter event from the fish element.
+ * @param {string} type - The fish type key for looking up FISH_TYPES data.
+ * @returns {void}
+ */
 function showFishTooltip(e, type) {
   const fishData = FISH_TYPES[type];
   const tooltip  = document.getElementById('fish-tooltip');
@@ -897,6 +1048,10 @@ function showFishTooltip(e, type) {
   tooltip.style.visibility = '';
 }
 
+/**
+ * Hide the fish tooltip by removing the 'show' class.
+ * @returns {void}
+ */
 function hideFishTooltip() {
   document.getElementById('fish-tooltip').classList.remove('show');
 }
@@ -905,6 +1060,14 @@ function hideFishTooltip() {
    Recent Catches
    ═══════════════════════════════════════════════ */
 
+/**
+ * Render the recent catches list showing the 10 most recent phishing detections.
+ * Each item displays a fish emoji, sender domain, relative timestamp, and risk score
+ * badge. Items are clickable to open the corresponding email in Gmail.
+ * @param {Array} catches - Array of catch objects with riskScore, timestamp,
+ *                          messageId, and senderDomain properties.
+ * @returns {void}
+ */
 function displayRecentCatches(catches) {
   const recentList = document.getElementById('recent-list');
 
@@ -954,6 +1117,12 @@ function displayRecentCatches(catches) {
    Utilities
    ═══════════════════════════════════════════════ */
 
+/**
+ * Map a numeric risk score (0-100) to a fish type key.
+ * @param {number} riskScore - The phishing risk score (0-100).
+ * @returns {string} Fish type key: 'shark' (90+), 'phishy' (76-89),
+ *                   'suspicious' (50-75), or 'friendly' (0-49).
+ */
 function getFishTypeFromRisk(riskScore) {
   if (riskScore >= 90) return 'shark';
   if (riskScore >= 76) return 'phishy';
@@ -961,6 +1130,12 @@ function getFishTypeFromRisk(riskScore) {
   return 'friendly';
 }
 
+/**
+ * Prompt the user with a confirmation dialog, then clear all fish collection
+ * history by sending a 'clearHistory' message to the background service worker.
+ * Reloads the fish tank on success.
+ * @returns {void}
+ */
 function clearHistory() {
   if (confirm('Are you sure you want to release all your fish and clear history?')) {
     chrome.runtime.sendMessage({ action: 'clearHistory' }, (response) => {
@@ -969,6 +1144,12 @@ function clearHistory() {
   }
 }
 
+/**
+ * Format a Date object into a human-readable relative time string.
+ * @param {Date} date - The date to format.
+ * @returns {string} Relative time string (e.g., "Just now", "5m ago", "2h ago",
+ *                   "3d ago", or a locale date string for dates older than 7 days).
+ */
 function formatTime(date) {
   const now  = new Date();
   const diff = now - date;
@@ -983,12 +1164,24 @@ function formatTime(date) {
   return date.toLocaleDateString();
 }
 
+/**
+ * Escape HTML special characters in a string to prevent XSS when inserting
+ * user-generated content into the DOM via innerHTML.
+ * @param {string} text - The raw text string to escape.
+ * @returns {string} The HTML-escaped string safe for innerHTML insertion.
+ */
 function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
 }
 
+/**
+ * Shuffle an array using the Fisher-Yates algorithm. Returns a new array
+ * without modifying the original.
+ * @param {Array} array - The array to shuffle.
+ * @returns {Array} A new array with elements in randomized order.
+ */
 function shuffleArray(array) {
   const a = [...array];
   for (let i = a.length - 1; i > 0; i--) {
@@ -1002,6 +1195,13 @@ function shuffleArray(array) {
    Trusted Domains Manager
    ═══════════════════════════════════════════════ */
 
+/**
+ * Initialize the Trusted Domains manager UI. Handles adding domains to the
+ * trusted or blocked lists, removing domains, rendering chip-style domain tags,
+ * and persisting changes to chrome.storage.local. Supports keyboard shortcut
+ * (Enter key) for quick trusted domain addition.
+ * @returns {void}
+ */
 function initTrustedDomains() {
   const input     = document.getElementById('td-input');
   const trustBtn  = document.getElementById('td-trust-btn');

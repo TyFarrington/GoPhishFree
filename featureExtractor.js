@@ -1,31 +1,61 @@
-// =====================================================================
-// GoPhishFree - Feature Extraction Module (Unified Schema)
-//
-// Three classes for extracting phishing signals at different tiers:
-//
-//   FeatureExtractor  (Tier 1)  - URL/email features + BEC/attachment
-//   DnsChecker        (Tier 2)  - DNS-over-HTTPS features
-//   PageAnalyzer      (Tier 3)  - Page structure features from HTML
-//
-// All features feed into ONE unified model (64 features total).
-// When a tier hasn't run, its features are default-filled with 0 and
-// context flags (dns_ran, deep_scan_ran) tell the model what's missing.
-//
-// Feature order in buildUnifiedVector() MUST match UNIFIED_FEATURES
-// in train_model.py.
-// =====================================================================
+/**
+ * @file featureExtractor.js
+ * @description Extracts 20+ phishing-signal features from email data for ML classification.
+ *              Contains three tiered classes: FeatureExtractor (Tier 1 URL/email/BEC/attachment
+ *              features), DnsChecker (Tier 2 DNS-over-HTTPS features), and PageAnalyzer (Tier 3
+ *              HTML page-structure features). All features feed into one unified 64-element
+ *              feature vector consumed by the TensorFlow.js phishing detection model.
+ *
+ * @programmers Ty Farrington, Andrew Reyes, Brett Suhr, Nicholas Holmes, Kaleb Howard
+ * @dateCreated 2025-02-01
+ * @dateRevised 2026-02-14 - Sprint 2: Added comprehensive comments and documentation (All programmers)
+ *
+ * @preconditions The Chrome extension environment must be active. Email data (text, links,
+ *                attachments, sender info) must be extracted from the Gmail DOM before calling
+ *                feature extraction methods. For DnsChecker, network access to public DoH
+ *                endpoints (Cloudflare/Google) is required. For PageAnalyzer, a parsed HTML
+ *                Document object must be provided.
+ * @acceptableInput emailData object with optional fields: text (string), links (array of
+ *                  {href, url, anchorText}), attachments (array of {filename, name}),
+ *                  senderDisplayName (string), senderDomain (string), replyTo (string).
+ *                  URLs as strings for URL feature extraction. Domain strings for DNS checks.
+ *                  Document objects and page URL strings for page analysis.
+ * @unacceptableInput null/undefined emailData without fallback handling (methods guard against
+ *                    this). Malformed URL strings that cannot be parsed by the URL constructor.
+ *                    Non-Document objects passed to PageAnalyzer.extractFeatures().
+ *
+ * @postconditions A flat feature object or a 64-element numeric array is returned, ready for
+ *                 model inference. No email content is transmitted externally by FeatureExtractor
+ *                 or PageAnalyzer. DnsChecker sends only domain names to public DoH endpoints.
+ * @returnValues FeatureExtractor.extractEmailFeatures() returns a flat object of numeric features.
+ *               FeatureExtractor.buildUnifiedVector() returns a 64-element number[].
+ *               DnsChecker.checkDomain() returns a DNS feature object.
+ *               PageAnalyzer.extractFeatures() returns a page feature object.
+ * @errorConditions Invalid URLs return default zero-filled feature objects. DNS query failures
+ *                  fall back to Google DoH, then return defaults. Unparseable domains return 0.
+ * @sideEffects DnsChecker makes external DNS-over-HTTPS requests to Cloudflare and Google.
+ *              DnsChecker caches results in-memory with a 5-minute TTL.
+ * @invariants Feature vector order in buildUnifiedVector() MUST match UNIFIED_FEATURES in
+ *             train_model.py. The vector is always exactly 64 elements. Missing tier features
+ *             default to 0 with context flags (dns_ran, deep_scan_ran) indicating availability.
+ * @knownFaults Shannon entropy calculation returns 0 for single-character strings. IP address
+ *              detection only covers IPv4. Punycode detection relies on the "xn--" prefix only.
+ */
 
-// -----------------------------------------------------------------
-// FeatureExtractor - Tier 1 Email/URL + BEC + Attachment Features
+// ═══════════════════════════════════════════════════════════════════════
+// SECTION: FeatureExtractor Class — Tier 1 Email/URL + BEC + Attachment
 //
 // Extracts 25 URL features, 9 custom-rule features, 5 BEC/linkless
 // features, and 5 attachment features from email content visible in
-// the Gmail DOM. No external requests.
-// -----------------------------------------------------------------
+// the Gmail DOM. No external requests are made by this class.
+// ═══════════════════════════════════════════════════════════════════════
 
 class FeatureExtractor {
+  /**
+   * Initializes keyword lists, suspicious TLD sets, shortener domain sets,
+   * and risky attachment extension sets used across all feature methods.
+   */
   constructor() {
-    // Suspicious TLDs
     this.suspiciousTLDs = new Set([
       'tk', 'ml', 'ga', 'cf', 'gq', 'xyz', 'top', 'click', 'download',
       'stream', 'online', 'site', 'website', 'space', 'tech', 'store'
@@ -73,11 +103,19 @@ class FeatureExtractor {
   }
 
   // ================================================================
-  //  URL Feature Extraction (25 features)
+  //  SECTION: URL Feature Extraction (25 features)
+  //  Parses a single URL and computes lexical/structural signals
+  //  such as dot count, subdomain depth, path length, special
+  //  characters, HTTPS status, IP-based hosting, TLD suspicion,
+  //  shortener detection, and punycode (IDN homograph) usage.
   // ================================================================
 
   /**
-   * Extract URL lexical features
+   * Extract 25 lexical and structural features from a single URL.
+   * @param {string} url - The URL string to analyze (with or without protocol prefix).
+   * @returns {Object} An object containing 25 named numeric features (e.g., NumDots,
+   *                   SubdomainLevel, UrlLength, NoHttps, IpAddress, SuspiciousTLD, etc.).
+   *                   Returns default zero-filled features if the URL is invalid.
    */
   extractURLFeatures(url) {
     if (!url || typeof url !== 'string') {
@@ -124,12 +162,25 @@ class FeatureExtractor {
   }
 
   // ================================================================
-  //  Email Feature Extraction (all local features)
+  //  SECTION: Email Feature Extraction (all local features)
+  //  Combines URL aggregation, link mismatch detection, header
+  //  analysis, text urgency/credential scoring, BEC pattern
+  //  detection, and attachment risk analysis into one flat object.
   // ================================================================
 
   /**
    * Extract all email-level features (URL, custom, BEC, attachment).
-   * Returns a flat object with all feature keys.
+   * Returns a flat object with all feature keys for model consumption.
+   * @param {Object} emailData - The email data object extracted from the Gmail DOM.
+   * @param {string} [emailData.text=''] - The plain-text body of the email.
+   * @param {Array}  [emailData.links=[]] - Array of link objects with href/url and anchorText.
+   * @param {Array}  [emailData.attachments=[]] - Array of attachment objects with filename/name.
+   * @param {string} [emailData.senderDisplayName] - Display name of the sender.
+   * @param {string} [emailData.senderDomain] - Domain portion of the sender's email address.
+   * @param {string} [emailData.replyTo] - Reply-To header value.
+   * @returns {Object} A flat object containing all numeric feature values (URL features,
+   *                   link mismatch, header mismatch, urgency, credential request, BEC,
+   *                   and attachment features).
    */
   extractEmailFeatures(emailData) {
     const text = emailData.text || '';
@@ -177,11 +228,18 @@ class FeatureExtractor {
   }
 
   // ================================================================
-  //  BEC / Linkless Feature Methods
+  //  SECTION: BEC / Linkless Feature Methods
+  //  Business Email Compromise detection features that identify
+  //  phishing attempts that rely on social engineering rather than
+  //  malicious links — financial requests, authority impersonation,
+  //  phone callback lures, and reply-to mismatches.
   // ================================================================
 
   /**
-   * Count financial request keywords (wire, invoice, ACH, etc.)
+   * Count financial request keywords in the email body (wire, invoice, ACH, etc.).
+   * Higher scores indicate potential BEC wire-fraud attempts.
+   * @param {string} text - The plain-text email body.
+   * @returns {number} The count of matched financial keywords found in the text.
    */
   calculateFinancialRequestScore(text) {
     const lower = text.toLowerCase();
@@ -189,7 +247,10 @@ class FeatureExtractor {
   }
 
   /**
-   * Count authority/impersonation keywords (CEO, payroll, IT dept, etc.)
+   * Count authority/impersonation keywords in the email body (CEO, payroll, IT dept, etc.).
+   * Higher scores suggest impersonation of executives or internal departments.
+   * @param {string} text - The plain-text email body.
+   * @returns {number} The count of matched authority/impersonation keywords.
    */
   calculateAuthorityImpersonationScore(text) {
     const lower = text.toLowerCase();
@@ -197,7 +258,10 @@ class FeatureExtractor {
   }
 
   /**
-   * Detect phone callback lure patterns ("call" + phone number)
+   * Detect phone callback lure patterns where the email urges the recipient to
+   * call a phone number (common in vishing/callback phishing).
+   * @param {string} text - The plain-text email body.
+   * @returns {number} 1 if a call keyword and phone number pattern co-occur, 0 otherwise.
    */
   detectPhoneCallbackPattern(text) {
     const lower = text.toLowerCase();
@@ -208,7 +272,11 @@ class FeatureExtractor {
   }
 
   /**
-   * Detect reply-to domain mismatch (reply-to domain != sender domain)
+   * Detect reply-to domain mismatch where the reply-to address points to a
+   * different domain than the sender, a common spoofing indicator.
+   * @param {string} replyTo - The Reply-To header value (email address or domain).
+   * @param {string} senderDomain - The sender's email domain.
+   * @returns {number} 1 if the reply-to domain differs from the sender domain, 0 otherwise.
    */
   detectReplyToMismatch(replyTo, senderDomain) {
     if (!replyTo || !senderDomain) return 0;
@@ -224,11 +292,16 @@ class FeatureExtractor {
   }
 
   // ================================================================
-  //  Attachment Feature Methods
+  //  SECTION: Attachment Feature Methods
+  //  Analyzes email attachments for risky file extensions, double
+  //  extension obfuscation, and randomized filename entropy — all
+  //  common techniques used to deliver malicious payloads.
   // ================================================================
 
   /**
-   * Check if any attachment has a risky file extension
+   * Check if any attachment has a risky file extension (executables, scripts, archives).
+   * @param {Array} attachments - Array of attachment objects with filename or name properties.
+   * @returns {number} 1 if any attachment has a risky extension, 0 otherwise.
    */
   hasRiskyAttachmentExtension(attachments) {
     if (!attachments || attachments.length === 0) return 0;
@@ -241,7 +314,10 @@ class FeatureExtractor {
   }
 
   /**
-   * Detect double file extensions (e.g., invoice.pdf.exe)
+   * Detect double file extensions (e.g., invoice.pdf.exe) — a social engineering
+   * trick to disguise executable files as harmless document types.
+   * @param {Array} attachments - Array of attachment objects with filename or name properties.
+   * @returns {number} 1 if any attachment uses a double extension ending in a risky type, 0 otherwise.
    */
   hasDoubleExtension(attachments) {
     if (!attachments || attachments.length === 0) return 0;
@@ -257,7 +333,10 @@ class FeatureExtractor {
   }
 
   /**
-   * Calculate Shannon entropy of attachment filenames (average across all)
+   * Calculate average Shannon entropy of attachment filenames. High entropy names
+   * (e.g., random hex strings) are common in automated malware delivery.
+   * @param {Array} attachments - Array of attachment objects with filename or name properties.
+   * @returns {number} Average Shannon entropy across all attachment filenames (0 if none).
    */
   calculateAttachmentNameEntropy(attachments) {
     if (!attachments || attachments.length === 0) return 0;
@@ -276,7 +355,10 @@ class FeatureExtractor {
   }
 
   /**
-   * Shannon entropy of a string
+   * Compute Shannon entropy of a string, measuring its information density /
+   * randomness. Values above ~3.5 bits suggest random or obfuscated strings.
+   * @param {string} str - The input string to compute entropy for.
+   * @returns {number} Shannon entropy in bits.
    */
   _shannonEntropy(str) {
     const freq = {};
@@ -393,11 +475,18 @@ class FeatureExtractor {
   }
 
   // ================================================================
-  //  URL Aggregation & Helper Methods
+  //  SECTION: URL Aggregation & Helper Methods
+  //  Averages URL features across all links in an email, detects
+  //  anchor-text / href domain mismatches, header spoofing, urgency
+  //  and credential-request language, and provides domain parsing
+  //  and TLD/shortener/IP detection utilities.
   // ================================================================
 
   /**
-   * Aggregate URL features from multiple links
+   * Aggregate URL features from multiple links by averaging feature values
+   * across all links found in the email.
+   * @param {Array} links - Array of link objects with href or url properties.
+   * @returns {Object} Averaged URL feature object with the same keys as extractURLFeatures().
    */
   aggregateURLFeatures(links) {
     if (!links || links.length === 0) {
@@ -423,7 +512,10 @@ class FeatureExtractor {
   }
 
   /**
-   * Count link mismatches (anchor text domain vs href domain)
+   * Count link mismatches where the anchor text displays a different domain than the
+   * actual href destination — a classic phishing deception technique.
+   * @param {Array} links - Array of link objects with anchorText and href/url properties.
+   * @returns {number} The count of links with domain mismatches.
    */
   countLinkMismatches(links) {
     let mismatchCount = 0;
@@ -441,7 +533,9 @@ class FeatureExtractor {
   }
 
   /**
-   * Calculate link mismatch ratio
+   * Calculate the ratio of mismatched links to total links in the email.
+   * @param {Array} links - Array of link objects with anchorText and href/url properties.
+   * @returns {number} Ratio of mismatched links (0.0 to 1.0), or 0 if no links present.
    */
   calculateLinkMismatchRatio(links) {
     if (!links || links.length === 0) return 0;
@@ -449,7 +543,11 @@ class FeatureExtractor {
   }
 
   /**
-   * Detect header mismatch (display name vs domain pattern)
+   * Detect header mismatch where the sender's display name does not align with
+   * their email domain, suggesting potential spoofing.
+   * @param {string} displayName - The sender's display name from the email header.
+   * @param {string} domain - The sender's email domain.
+   * @returns {number} 1 if a suspicious mismatch pattern is detected, 0 otherwise.
    */
   detectHeaderMismatch(displayName, domain) {
     if (!displayName || !domain) return 0;
@@ -472,7 +570,9 @@ class FeatureExtractor {
   }
 
   /**
-   * Count sensitive words in text
+   * Count the total number of sensitive words (urgency + credential keywords) in the text.
+   * @param {string} text - The plain-text email body.
+   * @returns {number} Total count of matched urgency and credential keywords.
    */
   countSensitiveWords(text) {
     const lowerText = text.toLowerCase();
@@ -481,7 +581,9 @@ class FeatureExtractor {
   }
 
   /**
-   * Calculate urgency score
+   * Calculate urgency score by counting urgency-related keywords in the email body.
+   * @param {string} text - The plain-text email body.
+   * @returns {number} Count of matched urgency keywords (e.g., "urgent", "verify now").
    */
   calculateUrgencyScore(text) {
     const lowerText = text.toLowerCase();
@@ -489,7 +591,9 @@ class FeatureExtractor {
   }
 
   /**
-   * Calculate credential request score
+   * Calculate credential request score by counting credential-related keywords in the body.
+   * @param {string} text - The plain-text email body.
+   * @returns {number} Count of matched credential keywords (e.g., "password", "login").
    */
   calculateCredentialRequestScore(text) {
     const lowerText = text.toLowerCase();
@@ -497,7 +601,9 @@ class FeatureExtractor {
   }
 
   /**
-   * Extract domain from URL or text
+   * Extract the domain hostname from a URL string or text containing a domain pattern.
+   * @param {string} input - A URL string or text that may contain a domain.
+   * @returns {string|null} The extracted domain hostname, or null if none found.
    */
   extractDomain(input) {
     if (!input) return null;
@@ -515,7 +621,10 @@ class FeatureExtractor {
   }
 
   /**
-   * Check if hostname is an IP address
+   * Check if a hostname is an IPv4 address (e.g., 192.168.1.1). IP-based URLs
+   * are a strong phishing indicator as legitimate sites use domain names.
+   * @param {string} hostname - The hostname portion of a URL.
+   * @returns {boolean} True if the hostname matches an IPv4 address pattern.
    */
   isIPAddress(hostname) {
     const ipv4Regex = /^(\d{1,3}\.){3}\d{1,3}$/;
@@ -523,7 +632,10 @@ class FeatureExtractor {
   }
 
   /**
-   * Check if hostname has suspicious TLD
+   * Check if the hostname ends with a suspicious top-level domain commonly abused
+   * by phishing campaigns (e.g., .tk, .xyz, .click).
+   * @param {string} hostname - The hostname portion of a URL.
+   * @returns {boolean} True if the TLD is in the suspicious set.
    */
   hasSuspiciousTLD(hostname) {
     const parts = hostname.split('.');
@@ -533,14 +645,20 @@ class FeatureExtractor {
   }
 
   /**
-   * Check if hostname is a shortener domain
+   * Check if the hostname belongs to a known URL shortener service (e.g., bit.ly, t.co).
+   * Shortened URLs obscure the true destination and are frequently used in phishing.
+   * @param {string} hostname - The hostname portion of a URL.
+   * @returns {boolean} True if the hostname matches a known shortener domain.
    */
   isShortenerDomain(hostname) {
     return this.shortenerDomains.has(hostname.toLowerCase());
   }
 
   /**
-   * Check if domain name appears in subdomain (phishing technique)
+   * Check if a recognizable domain name appears as a subdomain (e.g., paypal.com.evil.tk),
+   * a common phishing technique to impersonate legitimate sites.
+   * @param {string} hostname - The full hostname to analyze.
+   * @returns {boolean} True if a domain-like pattern is found in the subdomain portion.
    */
   checkDomainInSubdomains(hostname) {
     if (!hostname) return false;
@@ -559,7 +677,11 @@ class FeatureExtractor {
   }
 
   /**
-   * Check if domain name appears in URL path (phishing technique)
+   * Check if a different domain name appears in the URL path (e.g., evil.com/paypal.com/login),
+   * another phishing technique used to deceive users about the destination.
+   * @param {string} hostname - The actual hostname of the URL.
+   * @param {string} pathname - The path portion of the URL.
+   * @returns {boolean} True if a foreign domain pattern is found in the path.
    */
   checkDomainInPaths(hostname, pathname) {
     if (!pathname || pathname === '/') return false;
@@ -584,7 +706,9 @@ class FeatureExtractor {
   }
 
   /**
-   * Get default URL features (for missing/invalid URLs)
+   * Get default URL features (all zeros except NoHttps=1) for use when no valid URL
+   * is available. Ensures the feature vector always has the expected structure.
+   * @returns {Object} A zero-filled URL feature object with 25 named properties.
    */
   getDefaultURLFeatures() {
     return {
@@ -618,23 +742,34 @@ class FeatureExtractor {
   }
 }
 
-// -----------------------------------------------------------------
-// DnsChecker - Tier 2 DNS-over-HTTPS feature extraction
-// Uses public Cloudflare / Google DoH endpoints (no API keys).
+// ═══════════════════════════════════════════════════════════════════════
+// SECTION: DnsChecker Class — Tier 2 DNS-over-HTTPS Feature Extraction
+//
+// Uses public Cloudflare / Google DoH endpoints (no API keys required).
 // Only domain names are sent; no email content leaves the device.
-// -----------------------------------------------------------------
+// Features include domain existence, MX record presence, multiple IP
+// resolution, and random-string domain detection via Shannon entropy.
+// Results are cached in-memory with a 5-minute TTL.
+// ═══════════════════════════════════════════════════════════════════════
 
 class DnsChecker {
+  /**
+   * Initialize DNS checker with an in-memory cache, TTL, and request timeout.
+   */
   constructor() {
-    this.cache = new Map();        // domain -> { result, timestamp }
-    this.CACHE_TTL = 5 * 60_000;  // 5 minutes
-    this.TIMEOUT   = 4_000;       // 4 s per request
+    this.cache = new Map();
+    this.CACHE_TTL = 5 * 60_000;
+    this.TIMEOUT   = 4_000;
   }
 
-  // -- public API ---------------------------------------------------
+  // -- Public API ---------------------------------------------------
 
   /**
-   * Return Tier-2 DNS features for a single domain.
+   * Return Tier-2 DNS features for a single domain. Results are cached
+   * for 5 minutes to avoid redundant network requests.
+   * @param {string} domain - The domain name to check (e.g., "example.com").
+   * @returns {Promise<Object>} DNS feature object with DomainExists, HasMXRecord,
+   *                            MultipleIPs, and RandomStringDomain (all 0 or 1).
    */
   async checkDomain(domain) {
     if (!domain) return this.defaultFeatures();
@@ -673,7 +808,11 @@ class DnsChecker {
   }
 
   /**
-   * Check multiple domains in parallel. Returns aggregated features.
+   * Check multiple domains in parallel and return aggregated DNS features.
+   * @param {Array<string>} domains - Array of domain name strings to check.
+   * @returns {Promise<Object>} Aggregated DNS feature object with DomainExists (all exist),
+   *                            HasMXRecord (any has MX), MultipleIPs (any has multiple),
+   *                            RandomStringDomain (any is random), UnresolvedDomains (count).
    */
   async checkDomains(domains) {
     if (!domains || domains.length === 0) return this.defaultFeatures();
@@ -690,8 +829,15 @@ class DnsChecker {
     };
   }
 
-  // -- DNS-over-HTTPS query -----------------------------------------
+  // -- DNS-over-HTTPS Query ------------------------------------------
 
+  /**
+   * Perform a DNS-over-HTTPS query using Cloudflare as primary and Google as fallback.
+   * @param {string} domain - The domain name to query.
+   * @param {string} type - The DNS record type (e.g., 'A', 'MX').
+   * @returns {Promise<Object>} The parsed DNS JSON response.
+   * @throws {Error} If both Cloudflare and Google DoH endpoints fail.
+   */
   async dnsQuery(domain, type) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.TIMEOUT);
@@ -719,8 +865,14 @@ class DnsChecker {
     }
   }
 
-  // -- Random-string / entropy detection ----------------------------
+  // -- Random-String / Entropy Detection ----------------------------
 
+  /**
+   * Determine if a domain name appears to be a random string based on Shannon entropy.
+   * Randomly generated domains (DGA domains) are common in phishing infrastructure.
+   * @param {string} domain - The full domain name (e.g., "xk7f9a2b.tk").
+   * @returns {boolean} True if the domain name (excluding TLD) has entropy > 3.5 bits.
+   */
   isRandomString(domain) {
     const parts = domain.split('.');
     if (parts.length < 2) return false;
@@ -729,6 +881,11 @@ class DnsChecker {
     return this.shannonEntropy(name) > 3.5;
   }
 
+  /**
+   * Compute Shannon entropy of a string for randomness detection.
+   * @param {string} str - The input string.
+   * @returns {number} Shannon entropy in bits.
+   */
   shannonEntropy(str) {
     const freq = {};
     for (const ch of str) freq[ch] = (freq[ch] || 0) + 1;
@@ -743,6 +900,10 @@ class DnsChecker {
 
   // -- Defaults -----------------------------------------------------
 
+  /**
+   * Return a default DNS feature object with all values set to zero.
+   * @returns {Object} Zero-filled DNS feature object.
+   */
   defaultFeatures() {
     return {
       DomainExists: 0,
@@ -754,13 +915,21 @@ class DnsChecker {
   }
 }
 
-// -----------------------------------------------------------------
-// PageAnalyzer - Tier 3 Deep Scan feature extraction
-// Parses an HTML Document (from DOMParser) and extracts 13 features.
-// No network calls - pure DOM traversal.
-// -----------------------------------------------------------------
+// ═══════════════════════════════════════════════════════════════════════
+// SECTION: PageAnalyzer Class — Tier 3 Deep Scan Feature Extraction
+//
+// Parses an HTML Document object (from DOMParser) and extracts 13
+// page-structure features. No network calls — pure DOM traversal.
+// Detects insecure forms, external resource loading, iframe usage,
+// missing titles, image-only forms, and embedded brand names that
+// don't match the page domain (brand impersonation).
+// ═══════════════════════════════════════════════════════════════════════
 
 class PageAnalyzer {
+  /**
+   * Initialize PageAnalyzer with a list of well-known brand names
+   * used for brand impersonation detection.
+   */
   constructor() {
     this.brandNames = [
       'paypal', 'apple', 'google', 'microsoft', 'amazon', 'facebook',
@@ -771,6 +940,12 @@ class PageAnalyzer {
     ];
   }
 
+  /**
+   * Extract all 13 page-structure features from a parsed HTML Document.
+   * @param {Document} doc - A parsed HTML Document object (e.g., from DOMParser).
+   * @param {string} pageUrl - The URL of the page being analyzed.
+   * @returns {Object} An object containing 13 named numeric page features.
+   */
   extractFeatures(doc, pageUrl) {
     if (!doc || !doc.querySelectorAll) return this.defaultFeatures();
 
@@ -794,8 +969,13 @@ class PageAnalyzer {
     };
   }
 
-  // -- Form features ------------------------------------------------
+  // -- Form Feature Methods ------------------------------------------
 
+  /**
+   * Detect forms that submit over insecure HTTP (not HTTPS).
+   * @param {Document} doc - The parsed HTML Document.
+   * @returns {number} 1 if any form action uses http:, 0 otherwise.
+   */
   detectInsecureForms(doc) {
     const forms = doc.querySelectorAll('form');
     for (const form of forms) {
@@ -805,6 +985,11 @@ class PageAnalyzer {
     return 0;
   }
 
+  /**
+   * Detect forms with relative action URLs (not absolute), which may hide the true destination.
+   * @param {Document} doc - The parsed HTML Document.
+   * @returns {number} 1 if any form has a relative action, 0 otherwise.
+   */
   detectRelativeFormAction(doc) {
     const forms = doc.querySelectorAll('form');
     for (const form of forms) {
@@ -816,6 +1001,12 @@ class PageAnalyzer {
     return 0;
   }
 
+  /**
+   * Detect forms that submit data to an external domain different from the page domain.
+   * @param {Document} doc - The parsed HTML Document.
+   * @param {string} pageDomain - The domain of the current page.
+   * @returns {number} 1 if any form action points to an external domain, 0 otherwise.
+   */
   detectExtFormAction(doc, pageDomain) {
     const forms = doc.querySelectorAll('form');
     for (const form of forms) {
@@ -830,6 +1021,11 @@ class PageAnalyzer {
     return 0;
   }
 
+  /**
+   * Detect forms with abnormal action values (empty, "#", "about:blank", or "javascript:").
+   * @param {Document} doc - The parsed HTML Document.
+   * @returns {number} 1 if any form has an abnormal action, 0 otherwise.
+   */
   detectAbnormalFormAction(doc) {
     const forms = doc.querySelectorAll('form');
     for (const form of forms) {
@@ -842,6 +1038,11 @@ class PageAnalyzer {
     return 0;
   }
 
+  /**
+   * Detect forms that submit data to a mailto: address instead of a web endpoint.
+   * @param {Document} doc - The parsed HTML Document.
+   * @returns {number} 1 if any form action starts with "mailto:", 0 otherwise.
+   */
   detectSubmitToEmail(doc) {
     const forms = doc.querySelectorAll('form');
     for (const form of forms) {
@@ -851,8 +1052,14 @@ class PageAnalyzer {
     return 0;
   }
 
-  // -- External resource features -----------------------------------
+  // -- External Resource Feature Methods -----------------------------
 
+  /**
+   * Calculate the percentage of hyperlinks that point to external domains.
+   * @param {Document} doc - The parsed HTML Document.
+   * @param {string} pageDomain - The domain of the current page.
+   * @returns {number} Ratio of external hyperlinks (0.0 to 1.0), or 0 if no links.
+   */
   calcPctExtHyperlinks(doc, pageDomain) {
     const links = doc.querySelectorAll('a[href]');
     if (links.length === 0) return 0;
@@ -869,6 +1076,13 @@ class PageAnalyzer {
     return external / links.length;
   }
 
+  /**
+   * Calculate the percentage of resource URLs (images, scripts, stylesheets) loaded from
+   * external domains. High external resource usage can indicate a cloned/phishing page.
+   * @param {Document} doc - The parsed HTML Document.
+   * @param {string} pageDomain - The domain of the current page.
+   * @returns {number} Ratio of external resources (0.0 to 1.0), or 0 if no resources.
+   */
   calcPctExtResourceUrls(doc, pageDomain) {
     const resources = [
       ...doc.querySelectorAll('img[src]'),
@@ -889,6 +1103,13 @@ class PageAnalyzer {
     return external / resources.length;
   }
 
+  /**
+   * Detect if the page's favicon is loaded from an external domain, which can indicate
+   * that the page is impersonating another site by borrowing its favicon.
+   * @param {Document} doc - The parsed HTML Document.
+   * @param {string} pageDomain - The domain of the current page.
+   * @returns {number} 1 if the favicon is loaded from an external domain, 0 otherwise.
+   */
   detectExtFavicon(doc, pageDomain) {
     const icons = doc.querySelectorAll('link[rel~="icon"], link[rel="shortcut icon"]');
     for (const icon of icons) {
@@ -903,6 +1124,13 @@ class PageAnalyzer {
     return 0;
   }
 
+  /**
+   * Calculate the percentage of links that are null, self-referencing, or redirect-type
+   * (empty href, "#", javascript:void, etc.). Phishing pages often have non-functional links.
+   * @param {Document} doc - The parsed HTML Document.
+   * @param {string} pageUrl - The URL of the current page.
+   * @returns {number} Ratio of null/self-redirect links (0.0 to 1.0), or 0 if no links.
+   */
   calcPctNullSelfRedirect(doc, pageUrl) {
     const links = doc.querySelectorAll('a[href]');
     if (links.length === 0) return 0;
@@ -917,17 +1145,34 @@ class PageAnalyzer {
     return nullSelf / links.length;
   }
 
-  // -- Page structure features --------------------------------------
+  // -- Page Structure Feature Methods --------------------------------
 
+  /**
+   * Detect the presence of iframe or frame elements, which can be used to embed
+   * hidden content or load phishing forms from external sources.
+   * @param {Document} doc - The parsed HTML Document.
+   * @returns {number} 1 if any iframe or frame elements exist, 0 otherwise.
+   */
   detectIframeOrFrame(doc) {
     return doc.querySelectorAll('iframe, frame').length > 0 ? 1 : 0;
   }
 
+  /**
+   * Detect if the page is missing a title element or has an empty title.
+   * @param {Document} doc - The parsed HTML Document.
+   * @returns {number} 1 if the title is missing or empty, 0 otherwise.
+   */
   detectMissingTitle(doc) {
     const title = doc.querySelector('title');
     return (!title || !title.textContent.trim()) ? 1 : 0;
   }
 
+  /**
+   * Detect forms that contain only images (no text inputs), which can indicate a
+   * clickjacking attack or image-based phishing form.
+   * @param {Document} doc - The parsed HTML Document.
+   * @returns {number} 1 if any form contains images but no text inputs, 0 otherwise.
+   */
   detectImagesOnlyInForm(doc) {
     const forms = doc.querySelectorAll('form');
     for (const form of forms) {
@@ -941,6 +1186,13 @@ class PageAnalyzer {
     return 0;
   }
 
+  /**
+   * Detect if the page body mentions a well-known brand name that doesn't match the
+   * page's own domain, suggesting brand impersonation.
+   * @param {Document} doc - The parsed HTML Document.
+   * @param {string} pageDomain - The domain of the current page.
+   * @returns {number} 1 if a mismatched brand name is found, 0 otherwise.
+   */
   detectEmbeddedBrand(doc, pageDomain) {
     const bodyText = (doc.body ? doc.body.textContent : '').toLowerCase();
     for (const brand of this.brandNames) {
@@ -953,6 +1205,10 @@ class PageAnalyzer {
 
   // -- Defaults -----------------------------------------------------
 
+  /**
+   * Return a default page feature object with all 13 values set to zero.
+   * @returns {Object} Zero-filled page feature object.
+   */
   defaultFeatures() {
     return {
       InsecureForms: 0,

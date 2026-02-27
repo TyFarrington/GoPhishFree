@@ -1,16 +1,46 @@
-/* ═══════════════════════════════════════════════════════════════════
-   GoPhishFree – Content Script Styles
-   
-   Styles injected into the Gmail page for:
-     • Risk badges (low / medium / high / dangerous)
-     • Loading badges and deep-scan loading state
-     • Fish-caught celebration animation
-     • Analysis side panel (header, score, reasons, links)
-     • Deep Scan progress / results section
-     • Report Phish button and severity selection modal
-   ═══════════════════════════════════════════════════════════════════ */
+/**
+ * @file content.css
+ * @description Stylesheet for the GoPhishFree Chrome extension content script UI,
+ *   injected into Gmail pages. Provides all visual styling for the phishing detection
+ *   interface including risk badges on email headers, the analysis side panel, fish-caught
+ *   celebration animations, deep scan progress indicators, report phishing modal dialog,
+ *   and AI analysis result display. Uses a dark ocean-themed aesthetic with teal (#40e0d0)
+ *   as the primary accent color and gradient backgrounds evoking an underwater environment.
+ *
+ * @programmers Ty Farrington, Andrew Reyes, Brett Suhr, Nicholas Holmes, Kaleb Howard
+ * @dateCreated 2025-02-01
+ * @dateRevised 2026-02-14 - Sprint 2: Added comprehensive comments and documentation (All programmers)
+ *
+ * @preconditions
+ *   - Must be loaded as a content script stylesheet in a Gmail page context.
+ *   - Requires the GoPhishFree content.js to create DOM elements with the expected class names.
+ *   - The Fredoka One font (Google Fonts) is used for fish-caught titles but gracefully
+ *     falls back to cursive/sans-serif if unavailable.
+ *
+ * @postconditions
+ *   - All GoPhishFree UI elements in the Gmail DOM are styled according to risk levels.
+ *   - Animations (fish swim, badge pulse, popup transitions) are active via CSS keyframes.
+ *   - The side panel slides in/out from the right edge with a backdrop overlay.
+ *
+ * @sideEffects
+ *   - Injects styles into the Gmail page that may conflict with Gmail's own CSS if
+ *     class name collisions occur (mitigated by the 'gophishfree-' prefix convention).
+ *   - Defines global CSS keyframe animations prefixed to avoid conflicts.
+ *
+ * @knownFaults
+ *   - The side panel width (420px) is fixed and does not adapt to very narrow viewports.
+ *   - The z-index values (9999, 10000, 10001, 2147483647) are high to ensure overlay
+ *     priority but may conflict with other extensions or Gmail modals.
+ *   - The Fredoka One web font is referenced but not explicitly loaded by this stylesheet.
+ */
 
-/* ──────── Risk Badge (email header pill) ──────── */
+/* ═══════════════════════════════════════════════════════════════════
+   Risk Badge (Email Header Pill)
+   Inline badge displayed next to the email subject line. Uses gradient
+   backgrounds and border colors to indicate risk level (low/medium/
+   high/dangerous). Includes hover shimmer effect and click-to-open
+   side panel. The fish icon inside animates with a gentle swim motion.
+   ═══════════════════════════════════════════════════════════════════ */
 .gophishfree-risk-badge {
   display: inline-flex;
   align-items: center;
@@ -58,7 +88,7 @@
   75% { transform: translateX(-2px) rotate(-3deg); }
 }
 
-/* Low Risk - Friendly Fish */
+/* ── Risk Level: Low - Friendly Fish (green gradient, soft shadow) ── */
 .gophishfree-risk-badge.low {
   background: linear-gradient(135deg, #d4edda 0%, #b8e0c8 100%);
   color: #155724;
@@ -70,7 +100,7 @@
   background: linear-gradient(135deg, #c3e6cb 0%, #a8d9b8 100%);
 }
 
-/* Medium Risk - Suspicious Fish */
+/* ── Risk Level: Medium - Suspicious Fish (yellow/amber gradient) ── */
 .gophishfree-risk-badge.medium {
   background: linear-gradient(135deg, #fff3cd 0%, #ffe8a1 100%);
   color: #856404;
@@ -82,7 +112,7 @@
   background: linear-gradient(135deg, #ffeaa7 0%, #ffd93d 100%);
 }
 
-/* High Risk - Phishy Puffer */
+/* ── Risk Level: High - Phishy Puffer (red gradient, pulsing shadow) ── */
 .gophishfree-risk-badge.high {
   background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
   color: #721c24;
@@ -100,7 +130,7 @@
   50% { box-shadow: 0 2px 16px rgba(220, 53, 69, 0.4); }
 }
 
-/* Dangerous - Shark */
+/* ── Risk Level: Dangerous - Mega Phish Shark (dark red, alert animation) ── */
 .gophishfree-risk-badge.dangerous {
   background: linear-gradient(135deg, #721c24 0%, #4a0d12 100%);
   color: #fff;
@@ -124,7 +154,13 @@
   }
 }
 
-/* Fish Caught Animation */
+/* ═══════════════════════════════════════════════════════════════════
+   Fish Caught Celebration Animation
+   Full-screen overlay with a centered popup card displayed when a
+   phishing email is caught or reported. Features a bouncing fish emoji,
+   themed title, and auto-dismissal after 2.5 seconds. The popup scales
+   in with a spring easing curve and fades out on dismissal.
+   ═══════════════════════════════════════════════════════════════════ */
 .gophishfree-fish-caught {
   position: fixed;
   top: 50%;
@@ -201,7 +237,7 @@
   color: #fff;
 }
 
-/* Splash effect overlay */
+/* ── Splash Radial Gradient Overlay (behind fish caught popup) ── */
 .gophishfree-splash-overlay {
   position: fixed;
   top: 0;
@@ -222,7 +258,15 @@
   100% { opacity: 0; }
 }
 
-/* Side Panel Styles - Updated for fish theme */
+/* ═══════════════════════════════════════════════════════════════════
+   Analysis Side Panel
+   Fixed-position panel that slides in from the right edge of the
+   viewport. Contains the full scan analysis: header with banner image,
+   risk score display, risk indicator reasons, suspicious links list,
+   AI analysis section, deep scan controls, and report phish button.
+   Uses a dark ocean gradient background (#0a1628 → #0d2847 → #1a4a6e)
+   with teal accent colors and subtle water-bubble decoration at bottom.
+   ═══════════════════════════════════════════════════════════════════ */
 .gophishfree-sidepanel {
   position: fixed;
   top: 0;
@@ -308,6 +352,7 @@
   padding: 24px;
 }
 
+/* ── Score Display Card (centered score number, fish emoji, risk level) ── */
 .gophishfree-score-display {
   text-align: center;
   margin-bottom: 30px;
@@ -349,6 +394,7 @@
   animation: fishSwim 2s ease-in-out infinite;
 }
 
+/* ── Risk Indicators and Suspicious Links Sections ── */
 .gophishfree-reasons {
   margin-bottom: 30px;
 }
@@ -409,6 +455,7 @@
   text-decoration: underline;
 }
 
+/* ── Side Panel Backdrop Overlay (dims Gmail behind panel) ── */
 .gophishfree-overlay {
   position: fixed;
   top: 0;
@@ -425,7 +472,7 @@
   display: block;
 }
 
-/* Water bubble decoration in sidepanel */
+/* ── Water Bubble Decoration (subtle gradient at sidepanel bottom) ── */
 .gophishfree-sidepanel::after {
   content: '';
   position: fixed;
@@ -437,7 +484,13 @@
   pointer-events: none;
 }
 
-/* ──────── Tier 3: Deep Scan UI ──────── */
+/* ═══════════════════════════════════════════════════════════════════
+   Deep Scan UI (Tier 3)
+   Controls and feedback for the deep scan feature that fetches linked
+   pages to analyze their structure. Includes the trigger button with
+   teal accent border, progress spinner, status text, and result display
+   with a findings list showing threats found in linked page structure.
+   ═══════════════════════════════════════════════════════════════════ */
 
 .gophishfree-deepscan-section {
   margin-top: 30px;
@@ -445,7 +498,7 @@
   border-top: 1px solid rgba(64, 224, 208, 0.15);
 }
 
-/* Deep Scan Button */
+/* ── Deep Scan Trigger Button ── */
 .gophishfree-deepscan-btn {
   width: 100%;
   padding: 14px 20px;
@@ -485,7 +538,7 @@
   font-size: 20px;
 }
 
-/* Info text */
+/* ── Deep Scan Info Text ── */
 .gophishfree-deepscan-info {
   margin-top: 10px;
   font-size: 11px;
@@ -494,7 +547,7 @@
   text-align: center;
 }
 
-/* Progress / spinner */
+/* ── Deep Scan Progress Indicator and Spinner ── */
 .gophishfree-deepscan-progress {
   display: flex;
   align-items: center;
@@ -521,7 +574,7 @@
   to { transform: rotate(360deg); }
 }
 
-/* Deep Scan Result */
+/* ── Deep Scan Result Display and Findings List ── */
 .gophishfree-deepscan-result {
   margin-top: 14px;
 }
@@ -554,9 +607,15 @@
   color: #4ade80;
 }
 
-/* ──────── Loading Badge (initial scan & deep scan) ──────── */
+/* ═══════════════════════════════════════════════════════════════════
+   Loading Badge States
+   Visual states for the risk badge during scanning operations. Includes
+   the small inline spinner for the header pill, the initial scan loading
+   badge (neutral gray with pulse), the deep scan overlay state, and the
+   score update animation used when rescoring after deep scan.
+   ═══════════════════════════════════════════════════════════════════ */
 
-/* Badge spinner (small inline spinner for the header pill) */
+/* ── Badge Spinner (small inline spinner for the header pill) ── */
 .gophishfree-badge-spinner {
   display: inline-block;
   width: 14px;
@@ -572,7 +631,7 @@
   to { transform: rotate(360deg); }
 }
 
-/* Loading badge during initial scan */
+/* ── Loading Badge During Initial Email Scan ── */
 .gophishfree-loading-badge {
   background: linear-gradient(135deg, #e8edf2 0%, #dde3ea 100%);
   color: #5a6a7a;
@@ -592,7 +651,7 @@
   50%      { opacity: 0.65; }
 }
 
-/* Deep scan loading state (overlaid on existing coloured badge) */
+/* ── Deep Scan Loading State (overlaid on existing colored badge) ── */
 .gophishfree-deepscan-loading {
   animation: gpfDeepScanPulse 1.2s ease-in-out infinite;
   cursor: default;
@@ -607,7 +666,7 @@
   50%      { opacity: 0.7; filter: brightness(1.15); }
 }
 
-/* Score update animation */
+/* ── Score Update Animation (pulse during rescore) ── */
 .gophishfree-score-updating {
   animation: gpfScorePulse 0.3s ease-out;
 }
@@ -618,11 +677,16 @@
   100% { transform: scale(1);   opacity: 1; }
 }
 
-/* ═══════════════════════════════════════════════
-   Report Phish Button & Modal
-   ═══════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════════
+   Report Phish Button & Severity Selection Modal
+   Allows users to manually flag an email as phishing. The report button
+   sits in the side panel with a red accent theme. Clicking opens a modal
+   dialog with four severity options (low/medium/high/dangerous), each
+   styled with its corresponding risk color. The modal uses a high z-index
+   (2147483647) to ensure it appears above all Gmail UI elements.
+   ═══════════════════════════════════════════════════════════════════ */
 
-/* Report section in side panel */
+/* ── Report Button in Side Panel ── */
 .gophishfree-report-section {
   margin-top: 16px;
   padding-top: 16px;
@@ -671,7 +735,7 @@
   text-align: center;
 }
 
-/* ── Report Modal Overlay ── */
+/* ── Report Modal Overlay (full-screen backdrop with blur) ── */
 .gophishfree-report-overlay {
   position: fixed;
   inset: 0;
@@ -689,7 +753,7 @@
   opacity: 1;
 }
 
-/* ── Report Modal Card ── */
+/* ── Report Modal Card (centered dark-themed dialog) ── */
 .gophishfree-report-card {
   background: linear-gradient(165deg, #1e293b 0%, #0f172a 100%);
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -721,7 +785,7 @@
   margin-bottom: 20px;
 }
 
-/* ── Severity Option Buttons ── */
+/* ── Severity Option Buttons (low/medium/high/dangerous choices) ── */
 .gophishfree-report-options {
   display: flex;
   flex-direction: column;
@@ -795,7 +859,7 @@
   margin-left: auto;
 }
 
-/* ── Cancel Button ── */
+/* ── Cancel Button (dismisses report modal without action) ── */
 .gophishfree-report-cancel {
   width: 100%;
   margin-top: 14px;

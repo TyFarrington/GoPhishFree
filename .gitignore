@@ -33,5 +33,7 @@ node_modules/
 dist/
 build/
 
-# Website (separate repo later)
-website/
+# Website node_modules and build artifacts
+website/node_modules/
+website/dist/
+website/.git_temp/

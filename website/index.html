@@ -1,0 +1,45 @@
+<!--
+  @file index.html
+  @description Main HTML entry point for the GoPhishFree landing page. Sets up the document
+               structure, meta tags for SEO and viewport, preconnects to Google Fonts,
+               loads the Inter typeface, provides the favicon, and declares the #root
+               element where the React application is mounted.
+
+  @programmers Ty Farrington, Andrew Reyes, Brett Suhr, Nicholas Holmes, Kaleb Howard
+  @dateCreated 2026-02-14
+  @dateRevised 2026-02-14 - Sprint 2: Initial website creation with comprehensive documentation (All programmers)
+
+  @preconditions A modern browser with JavaScript enabled is required.
+                 The Vite dev server or a production build must serve this file.
+  @postconditions The browser loads all meta tags, fonts, and the React bundle, which
+                  mounts the application into the #root div.
+  @errorConditions If /src/main.jsx cannot be resolved, the browser will log a module load error.
+  @sideEffects Fetches external font resources from Google Fonts CDN.
+  @invariants The #root div is always present and empty before React hydration.
+  @knownFaults None.
+-->
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- ===== Character Set & Viewport ===== -->
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- ===== SEO Meta Tags ===== -->
+    <title>GoPhishFree — AI-Powered Phishing Detection for Gmail</title>
+    <meta name="description" content="GoPhishFree detects phishing emails directly in Gmail using local machine learning. 96.6% accuracy. Zero data leaves your device. Completely free." />
+
+    <!-- ===== Favicon ===== -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+    <!-- ===== Google Fonts (Inter) ===== -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <!-- React mount point -->
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
