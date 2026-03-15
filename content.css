@@ -455,6 +455,74 @@
   text-decoration: underline;
 }
 
+.gophishfree-link-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gophishfree-link-row .gophishfree-link-url {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gophishfree-browserling-btn {
+  flex-shrink: 0;
+  display: none;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #0a1628;
+  background: linear-gradient(135deg, #40e0d0 0%, #2bc4b4 100%);
+  border-radius: 6px;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.browserling-enabled .gophishfree-browserling-btn {
+  display: inline-flex;
+}
+
+.gophishfree-browserling-btn:hover {
+  background: linear-gradient(135deg, #5ff0e0 0%, #40e0d0 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(64, 224, 208, 0.4);
+  text-decoration: none;
+}
+
+/* ── Inline Browserling Button (inside Gmail email body) ── */
+.gophishfree-bl-inline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-left: 4px;
+  font-size: 12px;
+  line-height: 1;
+  vertical-align: middle;
+  background: rgba(64, 224, 208, 0.15);
+  border: 1px solid rgba(64, 224, 208, 0.4);
+  border-radius: 4px;
+  text-decoration: none !important;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+  top: -1px;
+}
+
+.gophishfree-bl-inline:hover {
+  background: rgba(64, 224, 208, 0.35);
+  border-color: #40e0d0;
+  box-shadow: 0 1px 6px rgba(64, 224, 208, 0.4);
+  transform: scale(1.15);
+}
+
 /* ── Side Panel Backdrop Overlay (dims Gmail behind panel) ── */
 .gophishfree-overlay {
   position: fixed;

@@ -977,6 +977,7 @@
   let modelReady        = false;
   let enhancedScanning  = true;      // Tier 2 DNS checks toggle
   let aiEnhanceEnabled  = false;    // Enhance with AI toggle
+  let browserlingEnabled = false;   // Open suspicious links via Browserling
 
   // Cached data from last scan
   let lastEmailData   = null;
@@ -1312,7 +1313,8 @@
       features._senderSeenBefore = false; // placeholder for local cache
 
       displayResults(prediction, emailData, emailId, fishData);
-      
+      injectInlineBrowserlingButtons();
+
       // Save to storage
       chrome.runtime.sendMessage({
         action: 'saveScanResult',
@@ -1455,11 +1457,13 @@
    */
   async function loadSettings() {
     return new Promise(resolve => {
-      chrome.storage.local.get(['enhancedScanning', 'aiEnhanceEnabled'], data => {
+      chrome.storage.local.get(['enhancedScanning', 'aiEnhanceEnabled', 'browserlingEnabled'], data => {
         enhancedScanning = data.enhancedScanning !== false;
         aiEnhanceEnabled = !!data.aiEnhanceEnabled;
+        browserlingEnabled = !!data.browserlingEnabled;
         console.log(`GoPhishFree: Enhanced scanning (DNS) ${enhancedScanning ? 'enabled' : 'disabled'}`);
         console.log(`GoPhishFree: AI enhancement ${aiEnhanceEnabled ? 'enabled' : 'disabled'}`);
+        console.log(`GoPhishFree: Browserling preview ${browserlingEnabled ? 'enabled' : 'disabled'}`);
         resolve();
       });
     });
@@ -1487,6 +1491,17 @@
       const arr = changes.customBlockedDomains.newValue || [];
       userBlockedDomains = new Set(arr.map(d => d.toLowerCase().trim()));
       console.log(`GoPhishFree: Blocked domains updated (${userBlockedDomains.size})`);
+    }
+    if (changes.browserlingEnabled) {
+      browserlingEnabled = !!changes.browserlingEnabled.newValue;
+      console.log(`GoPhishFree: Browserling preview toggled ${browserlingEnabled ? 'ON' : 'OFF'}`);
+      const linksEl = document.getElementById('gophishfree-links-list');
+      if (linksEl) linksEl.classList.toggle('browserling-enabled', browserlingEnabled);
+      if (browserlingEnabled) {
+        injectInlineBrowserlingButtons();
+      } else {
+        removeInlineBrowserlingButtons();
+      }
     }
   });
 
@@ -2543,6 +2558,7 @@
     }
     
     linksEl.innerHTML = '';
+    linksEl.classList.toggle('browserling-enabled', browserlingEnabled);
     const suspiciousLinks = emailData.links.filter(link => {
       const linkFeatures = extractor.extractURLFeatures(link.href);
       return linkFeatures.SuspiciousTLD || linkFeatures.ShortenerDomain || 
@@ -2553,12 +2569,28 @@
       suspiciousLinks.forEach(link => {
         const item = document.createElement('div');
         item.className = 'gophishfree-link-item suspicious';
+
+        const linkRow = document.createElement('div');
+        linkRow.className = 'gophishfree-link-row';
+
         const anchor = document.createElement('a');
         anchor.href = link.href;
         anchor.target = '_blank';
         anchor.className = 'gophishfree-link-url';
         anchor.textContent = link.href.length > 60 ? link.href.substring(0, 60) + '...' : link.href;
-        item.appendChild(anchor);
+        linkRow.appendChild(anchor);
+
+        const blBtn = document.createElement('a');
+        blBtn.href = 'https://www.browserling.com/browse/win10/chrome131/' + encodeURIComponent(link.href);
+        blBtn.target = '_blank';
+        blBtn.rel = 'noopener noreferrer';
+        blBtn.className = 'gophishfree-browserling-btn';
+        blBtn.title = 'Preview safely in Browserling';
+        blBtn.textContent = '🔍 Browserling';
+        linkRow.appendChild(blBtn);
+
+        item.appendChild(linkRow);
+
         if (link.anchorText && link.anchorText !== link.href) {
           const text = document.createElement('div');
           text.style.marginTop = '4px';
@@ -2574,6 +2606,47 @@
     }
   }
   
+  // ================================================================
+  //  Inline Browserling Buttons (Email Body)
+  //  Injects/removes small preview buttons next to every link in the
+  //  Gmail message body so users can safely open any link via Browserling.
+  // ================================================================
+
+  function injectInlineBrowserlingButtons() {
+    if (!browserlingEnabled) {
+      removeInlineBrowserlingButtons();
+      return;
+    }
+
+    const bodyContainers = document.querySelectorAll('.ii.gt, [role="list"] .a3s');
+    bodyContainers.forEach(container => {
+      const anchors = container.querySelectorAll('a[href]:not(.gophishfree-bl-inline)');
+      anchors.forEach(anchor => {
+        const href = anchor.getAttribute('href');
+        if (!href || href.startsWith('#') || href.includes('mail.google.com')) return;
+
+        const next = anchor.nextElementSibling;
+        if (next && next.classList.contains('gophishfree-bl-inline')) return;
+
+        const btn = document.createElement('a');
+        btn.href = 'https://www.browserling.com/browse/win10/chrome131/' + encodeURIComponent(href);
+        btn.target = '_blank';
+        btn.rel = 'noopener noreferrer';
+        btn.className = 'gophishfree-bl-inline';
+        btn.title = 'Preview safely in Browserling';
+        btn.textContent = '🔍';
+
+        btn.addEventListener('click', (e) => e.stopPropagation());
+
+        anchor.parentNode.insertBefore(btn, anchor.nextSibling);
+      });
+    });
+  }
+
+  function removeInlineBrowserlingButtons() {
+    document.querySelectorAll('.gophishfree-bl-inline').forEach(el => el.remove());
+  }
+
   // ================================================================
   //  Badge Management
   //  Controls the risk badge displayed on the Gmail email header.

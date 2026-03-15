@@ -665,6 +665,17 @@ function initSettings() {
     aiConfigBtn.addEventListener('click', openAiModal);
   }
 
+  // ── Browserling Preview toggle ──
+  const blToggle = document.getElementById('browserling-toggle');
+  if (blToggle) {
+    chrome.storage.local.get(['browserlingEnabled'], (data) => {
+      blToggle.checked = !!data.browserlingEnabled;
+    });
+    blToggle.addEventListener('change', () => {
+      chrome.storage.local.set({ browserlingEnabled: blToggle.checked });
+    });
+  }
+
   function updateAiUI(data) {
     const isEnabled = !!data.aiEnhanceEnabled;
     const hasKey = !!(data.aiApiKey && data.aiApiKey.trim());
