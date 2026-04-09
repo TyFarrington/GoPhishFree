@@ -77,7 +77,19 @@ export default function TeamPage() {
     script.id = "ld-team";
     script.textContent = JSON.stringify(schema);
     if (!document.getElementById("ld-team")) document.head.appendChild(script);
-    return () => { document.getElementById("ld-team")?.remove(); };
+
+    // Set page title and meta description to include all developer names
+    // so Google associates their names with this URL
+    const names = TEAM.map(m => m.name).join(", ");
+    document.title = `Meet the Team — ${names} | GoPhishFree`;
+    let metaDesc = document.querySelector('meta[name="description"]');
+    if (!metaDesc) { metaDesc = document.createElement("meta"); metaDesc.name = "description"; document.head.appendChild(metaDesc); }
+    metaDesc.content = `GoPhishFree was built by ${names} — a team of five developers at the University of Kansas. Learn about their roles in building this AI-powered phishing detection Chrome extension.`;
+
+    return () => {
+      document.getElementById("ld-team")?.remove();
+      document.title = "GoPhishFree — AI-Powered Phishing Detection for Gmail | Free Chrome Extension";
+    };
   }, []);
 
   return (
