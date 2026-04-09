@@ -43,6 +43,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X, Download } from "lucide-react";
+import { useNavigate, useLocation } from "react-router-dom";
 
 /* ═══════════════════════════════════════════════════════════════
    Navigation Link Configuration
@@ -77,6 +78,10 @@ export default function Navbar() {
   /** @type {[boolean, Function]} Whether the mobile navigation drawer is open */
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
+  const navigate = useNavigate();
+  const location = useLocation();
+  const isHomePage = location.pathname === "/";
+
   /* ─── Scroll Detection Effect ───────────────────────────────
      Listens for window scroll events and toggles `isScrolled`
      when the vertical scroll position crosses 20px. Cleans up
@@ -101,8 +106,18 @@ export default function Navbar() {
   const handleNavClick = (e, href) => {
     e.preventDefault();
     setIsMobileOpen(false);
-    const el = document.querySelector(href);
-    if (el) el.scrollIntoView({ behavior: "smooth" });
+    if (isHomePage) {
+      // Already on home — just scroll to the section
+      const el = document.querySelector(href);
+      if (el) el.scrollIntoView({ behavior: "smooth" });
+    } else {
+      // On a sub-page — navigate home and scroll after the page loads
+      navigate("/");
+      setTimeout(() => {
+        const el = document.querySelector(href);
+        if (el) el.scrollIntoView({ behavior: "smooth" });
+      }, 100);
+    }
   };
 
   /* ═══════════════════════════════════════════════════════════
@@ -121,7 +136,11 @@ export default function Navbar() {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", height: "7rem" }}>
 
           {/* ── Logo / Home Link ── */}
-          <a href="#hero" style={{ display: "flex", alignItems: "center", gap: "0.75rem", textDecoration: "none" }}>
+          <a
+            href="/"
+            onClick={(e) => { e.preventDefault(); navigate("/"); }}
+            style={{ display: "flex", alignItems: "center", gap: "0.75rem", textDecoration: "none" }}
+          >
             <img
               src="/logomini.png"
               alt="GoPhishFree"
