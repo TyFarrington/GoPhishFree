@@ -37,3 +37,6 @@ build/
 website/node_modules/
 website/dist/
 website/.git_temp/
+
+# Dataset cache (raw downloaded archives, 500MB+)
+Phishing_Dataset/_cache/
