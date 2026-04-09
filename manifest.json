@@ -2,7 +2,8 @@
   "manifest_version": 3,
   "name": "GoPhishFree",
   "version": "1.0.0",
-  "description": "Detect and manage suspected phishing emails with ML-based risk scoring",
+  "description": "AI-powered phishing email detection for Gmail. Local ML model scores every email — no data ever leaves your device.",
+  "homepage_url": "https://gophishfree.com",
   "permissions": [
     "storage",
     "activeTab"
@@ -33,15 +34,15 @@
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
-      "16": "Assets/logomini.png",
-      "48": "Assets/logomini.png",
-      "128": "Assets/logomini.png"
+      "16": "Assets/icon16.png",
+      "48": "Assets/icon48.png",
+      "128": "Assets/icon128.png"
     }
   },
   "icons": {
-    "16": "Assets/logomini.png",
-    "48": "Assets/logomini.png",
-    "128": "Assets/logomini.png"
+    "16": "Assets/icon16.png",
+    "48": "Assets/icon48.png",
+    "128": "Assets/icon128.png"
   },
   "web_accessible_resources": [
     {

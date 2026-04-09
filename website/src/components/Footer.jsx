@@ -35,15 +35,14 @@ const footerLinks = {
     { label: "Download", href: "#" },
   ],
   Resources: [
-    { label: "GitHub", href: "https://github.com", external: true },
-    { label: "Documentation", href: "#" },
-    { label: "Report a Bug", href: "https://github.com", external: true },
-    { label: "Changelog", href: "#" },
+    { label: "GitHub", href: "https://github.com/Areyes42/EECS582-CapstoneProject", external: true },
+    { label: "Meet the Team", href: "/team" },
+    { label: "Report a Bug", href: "https://github.com/Areyes42/EECS582-CapstoneProject", external: true },
   ],
   Legal: [
-    { label: "Privacy Policy", href: "#" },
-    { label: "Terms of Service", href: "#" },
-    { label: "Open Source License", href: "#" },
+    { label: "Privacy Policy", href: "/privacy" },
+    { label: "Terms of Service", href: "/terms" },
+    { label: "Open Source License", href: "https://github.com/Areyes42/EECS582-CapstoneProject", external: true },
   ],
 };
 
@@ -60,6 +59,8 @@ const footerLinks = {
  *
  * @returns {JSX.Element} The complete site footer
  */
+import { Link } from "react-router-dom";
+
 export default function Footer() {
   const currentYear = new Date().getFullYear();
 
@@ -79,7 +80,7 @@ export default function Footer() {
             {/* Social media icon buttons */}
             <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
               <a
-                href="https://github.com"
+                href="https://github.com/Areyes42/EECS582-CapstoneProject"
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{ width: 36, height: 36, borderRadius: "0.5rem", background: "#1e293b", border: "1px solid rgba(51,65,85,0.5)", display: "flex", alignItems: "center", justifyContent: "center", color: "#94a3b8", textDecoration: "none", transition: "border-color 0.3s, color 0.3s" }}
@@ -112,15 +113,27 @@ export default function Footer() {
               <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "0.75rem" }}>
                 {links.map((link) => (
                   <li key={link.label}>
-                    <a
-                      href={link.href}
-                      {...(link.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-                      style={{ color: "#94a3b8", fontSize: "0.875rem", textDecoration: "none", transition: "color 0.3s" }}
-                      onMouseEnter={e => { e.currentTarget.style.color = "#2dd4bf"; }}
-                      onMouseLeave={e => { e.currentTarget.style.color = "#94a3b8"; }}
-                    >
-                      {link.label}
-                    </a>
+                    {link.external ? (
+                      <a
+                        href={link.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ color: "#94a3b8", fontSize: "0.875rem", textDecoration: "none", transition: "color 0.3s" }}
+                        onMouseEnter={e => { e.currentTarget.style.color = "#2dd4bf"; }}
+                        onMouseLeave={e => { e.currentTarget.style.color = "#94a3b8"; }}
+                      >
+                        {link.label}
+                      </a>
+                    ) : (
+                      <Link
+                        to={link.href}
+                        style={{ color: "#94a3b8", fontSize: "0.875rem", textDecoration: "none", transition: "color 0.3s" }}
+                        onMouseEnter={e => { e.currentTarget.style.color = "#2dd4bf"; }}
+                        onMouseLeave={e => { e.currentTarget.style.color = "#94a3b8"; }}
+                      >
+                        {link.label}
+                      </Link>
+                    )}
                   </li>
                 ))}
               </ul>

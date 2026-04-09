@@ -152,7 +152,7 @@ async function callOpenAI(apiKey, payload, modelName) {
  * @throws {Error} On non-OK HTTP status or empty response body.
  */
 async function callAnthropic(apiKey, payload, modelName) {
-  const model = modelName || 'claude-sonnet-4-20250514';
+  const model = modelName || 'claude-haiku-4-5-20251001';
   const resp = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -433,8 +433,6 @@ function getFishTypeFromRisk(riskScore) {
  * the popup and content script never encounter undefined values.
  */
 chrome.runtime.onInstalled.addListener(() => {
-  console.log('GoPhishFree extension installed');
-  
   chrome.storage.local.set({
     scanHistory: [],
     flaggedCount: 0,
@@ -505,7 +503,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         };
         
         history.push(scanResult);
-        
+        // Cap history at 500 entries as stated in the Privacy Policy
+        if (history.length > 500) history.shift();
+
         // Classify fish and increment collection
         const fishType = getFishTypeFromRisk(scanResult.riskScore);
         fishCollection[fishType] = (fishCollection[fishType] || 0) + 1;
@@ -662,9 +662,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     fetch(url, {
       signal:         controller.signal,
       credentials:    'omit',            // Guard 2: NEVER send cookies/auth
-      headers:        { 'Accept': 'text/html' },
+      headers:        { 'Accept': 'text/html,application/xhtml+xml' },
       redirect:       'follow',
-      mode:           'cors',
+      // No 'mode' override — extension host_permissions bypass CORS natively.
+      // Setting mode:'cors' would re-enforce CORS headers from the server and
+      // break fetches to pages without Access-Control-Allow-Origin headers.
       referrerPolicy: 'no-referrer'      // Don't leak Gmail origin
     })
       .then(resp => {
@@ -728,6 +730,28 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   // routes it through the configured AI provider, validates the
   // response, and returns the result.
   if (request.action === 'runAiAnalysis') {
+    // _testOverride lets the popup test unsaved credentials directly
+    if (request._testOverride) {
+      const ov = request._testOverride;
+      if (!ov.apiKey) {
+        sendResponse({ success: false, error: 'API key is required' });
+        return true;
+      }
+      runAiProvider(ov.provider || 'openai', ov.apiKey, request.payload, ov.endpointUrl || '', ov.modelName || '')
+        .then(rawResult => {
+          const validated = validateAiResponse(rawResult);
+          if (!validated) {
+            sendResponse({ success: false, error: 'AI responded but returned an invalid schema' });
+          } else {
+            sendResponse({ success: true, result: validated });
+          }
+        })
+        .catch(err => {
+          sendResponse({ success: false, error: err.message || 'AI call failed' });
+        });
+      return true;
+    }
+
     chrome.storage.local.get(
       ['aiProvider', 'aiApiKey', 'aiEndpointUrl', 'aiModelName', 'aiEnhanceEnabled'],
       async (data) => {

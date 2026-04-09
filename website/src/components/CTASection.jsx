@@ -91,7 +91,7 @@ export default function CTASection() {
                 <ArrowRight size={20} />
               </a>
               <a
-                href="https://github.com"
+                href="https://github.com/Areyes42/EECS582-CapstoneProject"
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem", padding: "1rem 1.5rem", color: "#94a3b8", fontWeight: 500, textDecoration: "none", transition: "color 0.3s" }}

@@ -1244,6 +1244,29 @@
       background: rgba(255, 255, 255, 0.12);
     }
 
+    .ai-test-btn {
+      flex: 1;
+      padding: 10px;
+      border-radius: 10px;
+      font-family: 'Quicksand', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid rgba(64, 224, 208, 0.4);
+      background: rgba(64, 224, 208, 0.1);
+      color: #40e0d0;
+      transition: all 0.2s;
+    }
+
+    .ai-test-btn:hover {
+      background: rgba(64, 224, 208, 0.2);
+    }
+
+    .ai-test-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
     .ai-test-result {
       margin-top: 8px;
       padding: 8px 12px;
@@ -1646,6 +1669,19 @@
           <span class="td-empty" id="td-empty">No custom domains added yet</span>
         </div>
       </div>
+
+      <!-- Popup footer: legal links -->
+      <div style="margin-top:14px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.05);display:flex;align-items:center;justify-content:space-between;gap:6px;">
+        <span style="font-size:9px;color:rgba(255,255,255,0.2);">GoPhishFree &copy; 2026</span>
+        <div style="display:flex;gap:10px;">
+          <a href="https://gophishfree.com/terms" target="_blank" rel="noopener noreferrer"
+             style="font-size:9px;color:rgba(64,224,208,0.5);text-decoration:none;">Terms</a>
+          <a href="https://gophishfree.com/privacy" target="_blank" rel="noopener noreferrer"
+             style="font-size:9px;color:rgba(64,224,208,0.5);text-decoration:none;">Privacy</a>
+          <a href="https://gophishfree.com" target="_blank" rel="noopener noreferrer"
+             style="font-size:9px;color:rgba(64,224,208,0.5);text-decoration:none;">Website</a>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -1689,6 +1725,7 @@
       </div>
       <div class="ai-modal-footer">
         <button class="ai-cancel-btn" id="ai-modal-cancel">Cancel</button>
+        <button class="ai-test-btn" id="ai-modal-test">Test Key</button>
         <button class="ai-save-btn" id="ai-modal-save">Save Configuration</button>
       </div>
     </div>
@@ -1702,6 +1739,42 @@
     <div class="tooltip-detail"></div>
   </div>
   
+  <!-- ── First-run Terms of Service / Privacy consent overlay ── -->
+  <!-- NOTE: display:none here is intentional. JS sets display:flex when showing. -->
+  <div id="gpf-consent-overlay" style="display:none;position:fixed;inset:0;background:rgba(10,10,20,0.97);z-index:9999;flex-direction:column;align-items:center;justify-content:center;padding:24px;overflow-y:auto;">
+    <img src="Assets/icon48.png" alt="GoPhishFree" style="width:48px;height:48px;margin-bottom:12px;border-radius:8px;flex-shrink:0;">
+    <h2 style="color:#f1f5f9;font-size:1.15rem;font-weight:700;margin:0 0 4px;text-align:center;">Welcome to GoPhishFree</h2>
+    <p style="color:#64748b;font-size:0.72rem;text-align:center;margin:0 0 12px;">Experimental Research Software — Please Read Before Continuing</p>
+
+    <div style="background:#111827;border:1px solid rgba(51,65,85,0.6);border-radius:10px;padding:14px 16px;width:100%;max-width:360px;margin-bottom:14px;font-size:0.75rem;color:#94a3b8;line-height:1.65;max-height:210px;overflow-y:auto;">
+      <strong style="color:#fbbf24;">⚠ Experimental Software — No Guarantees</strong>
+      <p style="margin:6px 0 0;">GoPhishFree is an <strong style="color:#e2e8f0;">experimental capstone research project</strong>, not a commercial security product. By using this extension you acknowledge and agree to all of the following:</p>
+      <ul style="margin:8px 0 0;padding-left:18px;">
+        <li style="margin-bottom:5px;"><strong style="color:#e2e8f0;">Risk scores can be wrong.</strong> Our ML model has ~97% accuracy on test data, which means roughly 1 in 30 emails may be misclassified. A "Safe" score does <em>not</em> guarantee an email is safe.</li>
+        <li style="margin-bottom:5px;"><strong style="color:#e2e8f0;">Not a substitute for judgment.</strong> This extension is a supplemental aid only. You are solely responsible for any action you take based on its output, including clicking links in emails the extension labeled as safe.</li>
+        <li style="margin-bottom:5px;"><strong style="color:#e2e8f0;">No liability.</strong> The developers (Ty Farrington, Andrew Reyes, Brett Suhr, Nicholas Holmes, and Kaleb Howard) shall not be liable for any loss, harm, data breach, financial damage, or security incident arising from use of or reliance on this extension, including phishing attacks that GoPhishFree failed to detect.</li>
+        <li style="margin-bottom:5px;"><strong style="color:#e2e8f0;">Local processing.</strong> All ML inference runs on your device. No email content, subject lines, or sender addresses are transmitted to any server by us.</li>
+        <li style="margin-bottom:5px;"><strong style="color:#e2e8f0;">Optional AI features.</strong> If you enable AI enhancement with your own key, only numerical feature signals (not email text) are sent to your chosen AI provider under their terms.</li>
+        <li><strong style="color:#e2e8f0;">No warranty.</strong> This software is provided "as is" without warranty of any kind, express or implied.</li>
+      </ul>
+    </div>
+
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;">
+      <a href="https://gophishfree.com/terms" target="_blank" rel="noopener noreferrer"
+         style="color:#2dd4bf;font-size:0.78rem;text-decoration:underline;">Full Terms of Service</a>
+      <span style="color:#475569;font-size:0.7rem;">•</span>
+      <a href="https://gophishfree.com/privacy" target="_blank" rel="noopener noreferrer"
+         style="color:#2dd4bf;font-size:0.78rem;text-decoration:underline;">Privacy Policy</a>
+    </div>
+
+    <button id="gpf-consent-accept" style="width:100%;max-width:360px;padding:10px;background:linear-gradient(135deg,#0d9488,#0891b2);color:white;border:none;border-radius:8px;font-size:0.9rem;font-weight:600;cursor:pointer;flex-shrink:0;">
+      I Understand and Agree — Get Started
+    </button>
+    <p style="color:#475569;font-size:0.68rem;margin-top:10px;text-align:center;max-width:340px;line-height:1.5;">
+      By clicking above you confirm you have read and agree to the Terms of Service and Privacy Policy, and acknowledge that GoPhishFree is experimental software with no guarantees.
+    </p>
+  </div>
+
   <script src="popup.js"></script>
 </body>
 </html>

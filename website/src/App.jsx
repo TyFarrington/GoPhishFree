@@ -23,6 +23,7 @@
 /* ============================================================
  * Section Component Imports
  * ============================================================ */
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Navbar from "./components/Navbar";
 import HeroSection from "./components/HeroSection";
 import FeaturesSection from "./components/FeaturesSection";
@@ -34,29 +35,24 @@ import CTASection from "./components/CTASection";
 import FAQSection from "./components/FAQSection";
 import Footer from "./components/Footer";
 import { PageFishBackground } from "./components/SwimmingFish";
+import TermsPage from "./components/TermsPage";
+import PrivacyPolicyPage from "./components/PrivacyPolicyPage";
+import TeamPage from "./components/TeamPage";
 
-/* ============================================================
- * App Component — Root Layout & Section Composition
- * ============================================================ */
-function App() {
+const pageShell = {
+  minHeight: "100vh",
+  width: "100%",
+  backgroundColor: "#0a0a0f",
+  color: "#f1f5f9",
+  overflowX: "hidden",
+  position: "relative",
+};
+
+function HomePage() {
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        width: "100%",
-        backgroundColor: "#0a0a0f",
-        color: "#f1f5f9",
-        overflowX: "hidden",
-        position: "relative",
-      }}
-    >
-      {/* Animated fish background layer (renders behind all content) */}
+    <div style={pageShell}>
       <PageFishBackground />
-
-      {/* ---- Navigation ---- */}
       <Navbar />
-
-      {/* ---- Page Sections (rendered in scroll order) ---- */}
       <HeroSection />
       <DemoSection />
       <FeaturesSection />
@@ -65,10 +61,21 @@ function App() {
       <PrivacySection />
       <FAQSection />
       <CTASection />
-
-      {/* ---- Footer ---- */}
       <Footer />
     </div>
+  );
+}
+
+function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/terms" element={<TermsPage />} />
+        <Route path="/privacy" element={<PrivacyPolicyPage />} />
+        <Route path="/team" element={<TeamPage />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
 

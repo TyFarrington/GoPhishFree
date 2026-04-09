@@ -23,10 +23,44 @@
   command = "npm run build"
   publish = "dist"
 
+# ---- Canonical domain redirect ----
+# Force all traffic to the bare domain (no www). If you use www as primary,
+# swap these — but pick ONE canonical form and stick to it for SEO.
+[[redirects]]
+  from = "https://www.gophishfree.com/*"
+  to   = "https://gophishfree.com/:splat"
+  status = 301
+  force  = true
+
 # ---- SPA Redirect Rule ----
-# All unmatched routes are rewritten to index.html so React Router (or hash-based
-# navigation) can handle client-side routing.
+# All unmatched routes are rewritten to index.html so React Router handles routing.
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
+
+# ---- Security & SEO Headers ----
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options        = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy        = "strict-origin-when-cross-origin"
+    Permissions-Policy     = "camera=(), microphone=(), geolocation=()"
+    # Tells Google and crawlers this is the real canonical site
+    X-Robots-Tag           = "index, follow"
+
+[[headers]]
+  for = "/*.js"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*.css"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"

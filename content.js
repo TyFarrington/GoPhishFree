@@ -867,7 +867,6 @@
       if (result.customBlockedDomains && Array.isArray(result.customBlockedDomains)) {
         userBlockedDomains = new Set(result.customBlockedDomains.map(d => d.toLowerCase().trim()));
       }
-      console.log(`GoPhishFree: Loaded ${userTrustedDomains.size} custom trusted, ${userBlockedDomains.size} blocked domains`);
     });
   }
 
@@ -1255,7 +1254,6 @@
       const emailData = extractEmailData();
       
       if (!emailData || !emailData.senderDomain) {
-        console.log('GoPhishFree: Could not extract email data');
         removeLoadingBadge();
         scanInProgress = false;
         return;
@@ -1331,8 +1329,7 @@
         }
       }, (response) => {
         if (response && response.fishCollection) {
-          console.log('GoPhishFree: Fish collection updated', response.fishCollection);
-        }
+          }
       });
 
       // Auto-trigger AI analysis (if enabled, no extra button needed)
@@ -1461,9 +1458,6 @@
         enhancedScanning = data.enhancedScanning !== false;
         aiEnhanceEnabled = !!data.aiEnhanceEnabled;
         browserlingEnabled = !!data.browserlingEnabled;
-        console.log(`GoPhishFree: Enhanced scanning (DNS) ${enhancedScanning ? 'enabled' : 'disabled'}`);
-        console.log(`GoPhishFree: AI enhancement ${aiEnhanceEnabled ? 'enabled' : 'disabled'}`);
-        console.log(`GoPhishFree: Browserling preview ${browserlingEnabled ? 'enabled' : 'disabled'}`);
         resolve();
       });
     });
@@ -1476,25 +1470,20 @@
   chrome.storage.onChanged.addListener((changes) => {
     if (changes.enhancedScanning) {
       enhancedScanning = changes.enhancedScanning.newValue !== false;
-      console.log(`GoPhishFree: Enhanced scanning toggled ${enhancedScanning ? 'ON' : 'OFF'}`);
     }
     if (changes.aiEnhanceEnabled) {
       aiEnhanceEnabled = !!changes.aiEnhanceEnabled.newValue;
-      console.log(`GoPhishFree: AI enhancement toggled ${aiEnhanceEnabled ? 'ON' : 'OFF'}`);
     }
     if (changes.customTrustedDomains) {
       const arr = changes.customTrustedDomains.newValue || [];
       userTrustedDomains = new Set(arr.map(d => d.toLowerCase().trim()));
-      console.log(`GoPhishFree: Custom trusted domains updated (${userTrustedDomains.size})`);
     }
     if (changes.customBlockedDomains) {
       const arr = changes.customBlockedDomains.newValue || [];
       userBlockedDomains = new Set(arr.map(d => d.toLowerCase().trim()));
-      console.log(`GoPhishFree: Blocked domains updated (${userBlockedDomains.size})`);
     }
     if (changes.browserlingEnabled) {
       browserlingEnabled = !!changes.browserlingEnabled.newValue;
-      console.log(`GoPhishFree: Browserling preview toggled ${browserlingEnabled ? 'ON' : 'OFF'}`);
       const linksEl = document.getElementById('gophishfree-links-list');
       if (linksEl) linksEl.classList.toggle('browserling-enabled', browserlingEnabled);
       if (browserlingEnabled) {
@@ -1533,11 +1522,6 @@
 
       if (modelData.trees && modelData.scaler_mean && modelData.scaler_scale) {
         modelReady = true;
-        console.log(
-          `GoPhishFree: ML model loaded - ${modelData.n_estimators} trees, ` +
-          `${modelData.n_features} features` +
-          (modelData.calibration ? ', calibrated' : '')
-        );
       } else {
         console.warn('GoPhishFree: Model JSON missing required fields, falling back to rules');
       }
@@ -2128,9 +2112,16 @@
     // Tier
     if (tierEl) {
       const tierColors = { Safe: '#40e0d0', Caution: '#ffc107', Suspicious: '#ffa726', Dangerous: '#ff6b6b' };
-      tierEl.innerHTML =
-        `<span style="color:${tierColors[result.riskTier] || '#b8d4e3'};font-weight:600;">${result.riskTier}</span>` +
-        (result.phishType?.length ? ` \u2022 ${result.phishType.join(', ')}` : '');
+      tierEl.textContent = '';
+      const tierSpan = document.createElement('span');
+      tierSpan.style.color      = tierColors[result.riskTier] || '#b8d4e3';
+      tierSpan.style.fontWeight = '600';
+      tierSpan.textContent = result.riskTier;
+      tierEl.appendChild(tierSpan);
+      if (result.phishType?.length) {
+        const types = document.createTextNode(' \u2022 ' + result.phishType.join(', '));
+        tierEl.appendChild(types);
+      }
     }
 
     // Top Signals
@@ -2245,6 +2236,8 @@
       // 3. Fetch each page via background service worker
       status.textContent = `Scanning 0/${uniqueUrls.length} pages...`;
       const pageFeaturesList = [];
+      let successCount = 0;
+      let failCount    = 0;
 
       for (let i = 0; i < uniqueUrls.length; i++) {
         status.textContent = `Scanning ${i + 1}/${uniqueUrls.length} pages...`;
@@ -2263,25 +2256,30 @@
             const doc = parser.parseFromString(safeHtml, 'text/html');
 
             if (doc.querySelectorAll('*').length > 50_000) {
-              console.warn('GoPhishFree: Skipping oversized DOM for', uniqueUrls[i]);
+              failCount++; // oversized DOM — skip
             } else {
               const feats = pageAnalyzer.extractFeatures(doc, uniqueUrls[i]);
               pageFeaturesList.push(feats);
+              successCount++;
             }
-          } catch (_) { /* skip unparseable pages */ }
+          } catch (_) { failCount++; }
+        } else {
+          failCount++;
         }
       }
 
-      // 4. Aggregate page features (worst-case)
+      // 4. Aggregate page features (worst-case across all scanned pages)
+      //    Returns null if nothing was fetched — runInference must handle null.
       const aggregatedPage = aggregatePageFeatures(pageFeaturesList);
 
       // 5. Re-run the SAME unified model with page features filled in
       status.textContent = 'Rescoring with page analysis...';
-      const newPrediction = runInference(lastFeatures, lastDnsFeatures, aggregatedPage, lastEmailData);
+      const prevScore      = lastPrediction ? lastPrediction.riskScore : null;
+      const newPrediction  = runInference(lastFeatures, lastDnsFeatures, aggregatedPage, lastEmailData);
 
       // 6. Display updated score
       progress.style.display = 'none';
-      showDeepScanResult(newPrediction, aggregatedPage);
+      showDeepScanResult(newPrediction, aggregatedPage, successCount, failCount, prevScore);
 
     } catch (err) {
       console.error('GoPhishFree: Deep scan failed', err);
@@ -2295,11 +2293,12 @@
 
   /**
    * Aggregate page features across multiple pages (worst-case / max).
+   * Returns null when no pages were successfully fetched — callers must
+   * treat null as "deep scan produced no page data" and not treat it the
+   * same as a scan that found clean pages.
    */
   function aggregatePageFeatures(featsList) {
-    if (!featsList || featsList.length === 0) {
-      return pageAnalyzer ? pageAnalyzer.defaultFeatures() : null;
-    }
+    if (!featsList || featsList.length === 0) return null;
     const agg = { ...featsList[0] };
     for (let i = 1; i < featsList.length; i++) {
       for (const key of Object.keys(agg)) {
@@ -2312,58 +2311,118 @@
   /**
    * Show deep scan result: update score, reasons, and findings summary.
    */
-  function showDeepScanResult(prediction, pageFeatures) {
+  function showDeepScanResult(prediction, pageFeatures, successCount, failCount, prevScore) {
     const resultEl  = document.getElementById('gophishfree-deepscan-result');
     const scoreEl   = document.getElementById('gophishfree-score');
     const levelEl   = document.getElementById('gophishfree-level');
     const fishEl    = document.getElementById('gophishfree-fish');
     const reasonsEl = document.getElementById('gophishfree-reasons-list');
 
+    // --- Case: all page fetches failed — don't pretend scan ran ---
+    if (successCount === 0) {
+      resultEl.style.display = 'block';
+      resultEl.textContent = '';
+
+      const badge = document.createElement('div');
+      badge.className = 'gophishfree-deepscan-badge incomplete';
+      badge.textContent = 'Deep Scan Incomplete';
+      resultEl.appendChild(badge);
+
+      const msg = document.createElement('div');
+      msg.className = 'gophishfree-deepscan-finding';
+      msg.textContent = failCount > 0
+        ? `Could not reach any of the ${failCount} linked page(s). The original score has not changed.`
+        : 'No linked pages were found to scan.';
+      resultEl.appendChild(msg);
+
+      restorePreviousBadge();
+      return;
+    }
+
+    // --- Update risk badge + score with animation ---
     const fishData = getFishData(prediction.riskScore);
-
     updateRiskBadge(prediction.riskLevel, prediction.riskScore, fishData);
-
     lastPrediction = prediction;
-    lastFishData = fishData;
+    lastFishData   = fishData;
 
     scoreEl.classList.add('gophishfree-score-updating');
     setTimeout(() => {
       scoreEl.textContent = prediction.riskScore;
-      scoreEl.className = `gophishfree-score-value ${prediction.riskLevel.toLowerCase()}`;
-      levelEl.textContent = `${prediction.riskLevel} Risk - ${fishData.name}`;
-      fishEl.textContent = fishData.emoji;
+      scoreEl.className   = 'gophishfree-score-value ' + prediction.riskLevel.toLowerCase();
+      levelEl.textContent = prediction.riskLevel + ' Risk - ' + fishData.name;
+      fishEl.textContent  = fishData.emoji;
       scoreEl.classList.remove('gophishfree-score-updating');
     }, 300);
 
-    reasonsEl.innerHTML = '';
+    // --- Update reasons list ---
+    reasonsEl.textContent = '';
     prediction.reasons.forEach(reason => {
       const item = document.createElement('div');
-      item.className = 'gophishfree-reason-item';
+      item.className   = 'gophishfree-reason-item';
       item.textContent = reason;
       reasonsEl.appendChild(item);
     });
 
+    // --- Build findings from real page features ---
     const findings = [];
     if (pageFeatures) {
-      if (pageFeatures.InsecureForms)    findings.push('Insecure forms detected');
-      if (pageFeatures.ExtFormAction)    findings.push('External form actions');
-      if (pageFeatures.IframeOrFrame)    findings.push('Hidden iframes found');
-      if (pageFeatures.MissingTitle)     findings.push('Page has no title');
-      if (pageFeatures.EmbeddedBrandName) findings.push('Brand impersonation detected');
-      if (pageFeatures.PctExtHyperlinks > 0.5) findings.push('Mostly external links');
-      if (pageFeatures.SubmitInfoToEmail) findings.push('Form submits to email');
+      if (pageFeatures.InsecureForms)              findings.push('Insecure forms detected');
+      if (pageFeatures.ExtFormAction)              findings.push('External form actions found');
+      if (pageFeatures.IframeOrFrame)              findings.push('Hidden iframes found');
+      if (pageFeatures.MissingTitle)               findings.push('Linked page has no title');
+      if (pageFeatures.EmbeddedBrandName)          findings.push('Brand impersonation detected');
+      if (pageFeatures.PctExtHyperlinks > 0.5)     findings.push('Mostly external links on page');
+      if (pageFeatures.SubmitInfoToEmail)          findings.push('Form submits data to an email address');
     }
 
+    // --- Assemble result panel using safe DOM methods only ---
+    resultEl.textContent = '';
     resultEl.style.display = 'block';
-    resultEl.innerHTML = `
-      <div class="gophishfree-deepscan-badge">Deep Scan Complete</div>
-      <div class="gophishfree-deepscan-findings">
-        ${findings.length > 0
-          ? findings.map(f => `<div class="gophishfree-deepscan-finding">\u2022 ${f}</div>`).join('')
-          : '<div class="gophishfree-deepscan-finding safe">No additional threats found in page structure.</div>'
-        }
-      </div>
-    `;
+
+    const badge = document.createElement('div');
+    badge.className   = 'gophishfree-deepscan-badge';
+    badge.textContent = 'Deep Scan Complete';
+    resultEl.appendChild(badge);
+
+    // Score delta line
+    if (prevScore !== null && prevScore !== undefined) {
+      const delta     = prediction.riskScore - prevScore;
+      const deltaEl   = document.createElement('div');
+      deltaEl.className = 'gophishfree-deepscan-finding';
+      const arrow = delta > 0 ? '\u25b2' : delta < 0 ? '\u25bc' : '\u25cf';
+      deltaEl.textContent = arrow + ' Score: ' + prevScore + ' \u2192 ' + prediction.riskScore +
+        (delta !== 0 ? ' (' + (delta > 0 ? '+' : '') + delta + ')' : ' (unchanged)');
+      resultEl.appendChild(deltaEl);
+    }
+
+    // Findings list
+    const findingsWrap = document.createElement('div');
+    findingsWrap.className = 'gophishfree-deepscan-findings';
+
+    if (findings.length > 0) {
+      findings.forEach(f => {
+        const row = document.createElement('div');
+        row.className   = 'gophishfree-deepscan-finding';
+        row.textContent = '\u2022 ' + f;
+        findingsWrap.appendChild(row);
+      });
+    } else {
+      const row = document.createElement('div');
+      row.className   = 'gophishfree-deepscan-finding safe';
+      row.textContent = 'No additional threats found in page structure.';
+      findingsWrap.appendChild(row);
+    }
+    resultEl.appendChild(findingsWrap);
+
+    // Stats footer
+    const stats = document.createElement('div');
+    stats.className   = 'gophishfree-deepscan-finding';
+    stats.style.marginTop = '6px';
+    stats.style.opacity   = '0.6';
+    stats.style.fontSize  = '0.78em';
+    stats.textContent = successCount + ' page' + (successCount !== 1 ? 's' : '') + ' scanned' +
+      (failCount > 0 ? ', ' + failCount + ' unreachable' : '');
+    resultEl.appendChild(stats);
 
     // Re-run AI analysis with deep scan data (auto, no extra button)
     if (lastFeatures) {
@@ -2502,7 +2561,6 @@
       }
     }, (response) => {
       if (response && response.fishCollection) {
-        console.log('GoPhishFree: Report saved, fish collection updated', response.fishCollection);
       }
     });
 

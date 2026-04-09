@@ -589,6 +589,32 @@ function stopAnimation() {
    ═══════════════════════════════════════════════ */
 
 document.addEventListener('DOMContentLoaded', () => {
+  chrome.storage.local.get(['tosAccepted'], (result) => {
+    if (result.tosAccepted) {
+      initApp();
+    } else {
+      showConsentDialog();
+    }
+  });
+});
+
+function showConsentDialog() {
+  const overlay = document.getElementById('gpf-consent-overlay');
+  const btn     = document.getElementById('gpf-consent-accept');
+  if (!overlay || !btn) return;
+
+  overlay.style.display = 'flex';
+
+  // { once: true } ensures the handler fires exactly once even if called multiple times
+  btn.addEventListener('click', () => {
+    chrome.storage.local.set({ tosAccepted: true }, () => {
+      overlay.style.display = 'none';
+      initApp();
+    });
+  }, { once: true });
+}
+
+function initApp() {
   initCollectionIcons();
   loadFishTank();
   initBubbles();
@@ -600,7 +626,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Refresh periodically
   setInterval(loadFishTank, 30000);
-});
+}
 
 /* ═══════════════════════════════════════════════
    Collection Panel Icons (SVG instead of emoji)
@@ -715,6 +741,7 @@ function initAiModal() {
   const closeBtn      = document.getElementById('ai-modal-close');
   const cancelBtn     = document.getElementById('ai-modal-cancel');
   const saveBtn       = document.getElementById('ai-modal-save');
+  const testBtn       = document.getElementById('ai-modal-test');
   const providerSel   = document.getElementById('ai-provider-select');
   const endpointField = document.getElementById('ai-endpoint-field');
   const modelField    = document.getElementById('ai-model-field');
@@ -737,6 +764,62 @@ function initAiModal() {
   overlay.addEventListener('click', (e) => {
     if (e.target === overlay) closeAiModal();
   });
+
+  // Test Key handler — sends a minimal probe to the provider and shows result
+  if (testBtn) {
+    testBtn.addEventListener('click', async () => {
+      const provider    = document.getElementById('ai-provider-select').value;
+      const apiKey      = document.getElementById('ai-api-key').value.trim();
+      const endpointUrl = document.getElementById('ai-endpoint-url').value.trim();
+      const modelName   = document.getElementById('ai-model-name').value.trim();
+      const testResult  = document.getElementById('ai-test-result');
+
+      if (!apiKey) {
+        testResult.className = 'ai-test-result error';
+        testResult.textContent = 'Enter an API key first.';
+        return;
+      }
+
+      testBtn.disabled = true;
+      testBtn.textContent = 'Testing...';
+      if (testResult) { testResult.className = 'ai-test-result'; testResult.textContent = ''; }
+
+      // Minimal test payload — same structure as real calls
+      const testPayload = {
+        email_signals: { reply_to_mismatch: false, from_domain: 'test.example.com', sender_seen_before: false, displayname_mismatch_score: 0 },
+        url_signals:   { link_count: 1, link_domains: ['example.com'], has_shortener: false, has_ip_url: false, punycode_present: false, suspicious_tld_present: false, url_entropy_score: 0.2, mismatch_link_text_domain: false },
+        language_cues: { urgency_score: 0, credential_score: 0, financial_request_score: 0, callback_score: 0, secrecy_score: 0 },
+        attachment_signals: { has_attachment: false, attachment_count: 0, risky_attachment_ext_present: false, double_extension_present: false },
+        dns_signals: { dns_ran: false },
+        deep_scan_signals: { deep_scan_ran: false },
+        local_model: { local_risk_score: 10, local_confidence: 0.85, top_local_reasons: ['Test connection'] }
+      };
+
+      chrome.runtime.sendMessage(
+        {
+          action: 'runAiAnalysis',
+          payload: testPayload,
+          _testOverride: { provider, apiKey, endpointUrl, modelName }
+        },
+        (resp) => {
+          testBtn.disabled = false;
+          testBtn.textContent = 'Test Key';
+          if (chrome.runtime.lastError) {
+            testResult.className = 'ai-test-result error';
+            testResult.textContent = 'Extension error: ' + chrome.runtime.lastError.message;
+            return;
+          }
+          if (resp && resp.success) {
+            testResult.className = 'ai-test-result success';
+            testResult.textContent = 'Connection successful! Provider responded correctly.';
+          } else {
+            testResult.className = 'ai-test-result error';
+            testResult.textContent = 'Connection failed: ' + (resp?.error || 'Unknown error. Check your API key.');
+          }
+        }
+      );
+    });
+  }
 
   // Save handler
   if (saveBtn) {

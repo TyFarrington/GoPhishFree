@@ -675,6 +675,12 @@
   color: #4ade80;
 }
 
+.gophishfree-deepscan-badge.incomplete {
+  background: rgba(251, 191, 36, 0.15);
+  color: #fbbf24;
+  border-color: rgba(251, 191, 36, 0.35);
+}
+
 /* ═══════════════════════════════════════════════════════════════════
    Loading Badge States
    Visual states for the risk badge during scanning operations. Includes
