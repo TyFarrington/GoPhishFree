@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "GoPhishFree",
   "version": "1.0.0",
-  "description": "AI-powered phishing email detection for Gmail. Local ML model scores every email — no data ever leaves your device.",
+  "description": "Phishing email detection for Gmail using local ML — 97% accuracy. No email content ever leaves your device.",
   "homepage_url": "https://gophishfree.com",
   "permissions": [
     "storage",
@@ -44,9 +44,12 @@
     "48": "Assets/icon48.png",
     "128": "Assets/icon128.png"
   },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  },
   "web_accessible_resources": [
     {
-      "resources": ["sidepanel.html", "model/*", "Assets/*"],
+      "resources": ["model/*", "Assets/*"],
       "matches": ["https://mail.google.com/*"]
     }
   ]

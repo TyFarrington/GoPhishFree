@@ -799,7 +799,7 @@ function initAiModal() {
         {
           action: 'runAiAnalysis',
           payload: testPayload,
-          _testOverride: { provider, apiKey, endpointUrl, modelName }
+          _testKey: { provider, apiKey, endpointUrl, modelName }
         },
         (resp) => {
           testBtn.disabled = false;

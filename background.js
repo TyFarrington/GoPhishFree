@@ -730,25 +730,28 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   // routes it through the configured AI provider, validates the
   // response, and returns the result.
   if (request.action === 'runAiAnalysis') {
-    // _testOverride lets the popup test unsaved credentials directly
-    if (request._testOverride) {
-      const ov = request._testOverride;
-      if (!ov.apiKey) {
+    // _testKey lets the popup test unsaved credentials before saving.
+    // Only accepted from the extension's own pages (no sender.tab = extension page).
+    if (request._testKey) {
+      if (sender.tab) {
+        // Reject if message came from a content script (web page) — extension pages have no tab
+        sendResponse({ success: false, error: 'Unauthorized' });
+        return true;
+      }
+      const { provider, apiKey, endpointUrl, modelName } = request._testKey;
+      if (!apiKey) {
         sendResponse({ success: false, error: 'API key is required' });
         return true;
       }
-      runAiProvider(ov.provider || 'openai', ov.apiKey, request.payload, ov.endpointUrl || '', ov.modelName || '')
+      runAiProvider(provider || 'openai', apiKey, request.payload, endpointUrl || '', modelName || '')
         .then(rawResult => {
           const validated = validateAiResponse(rawResult);
-          if (!validated) {
-            sendResponse({ success: false, error: 'AI responded but returned an invalid schema' });
-          } else {
-            sendResponse({ success: true, result: validated });
-          }
+          sendResponse(validated
+            ? { success: true, result: validated }
+            : { success: false, error: 'AI responded but returned an invalid schema' }
+          );
         })
-        .catch(err => {
-          sendResponse({ success: false, error: err.message || 'AI call failed' });
-        });
+        .catch(err => sendResponse({ success: false, error: err.message || 'AI call failed' }));
       return true;
     }
 
@@ -801,4 +804,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     });
     return true;
   }
+
+  // Catch-all — return error for unrecognized actions so senders don't hang
+  sendResponse({ success: false, error: 'Unknown action: ' + request.action });
+  return false;
 });
