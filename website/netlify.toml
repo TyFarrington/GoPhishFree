@@ -32,8 +32,29 @@
   status = 301
   force  = true
 
+# ---- Static file exclusions (must come BEFORE the SPA catch-all) ----
+# Netlify processes redirects top-to-bottom and stops at the first match.
+# These rules let static files pass through untouched so Google can fetch them.
+[[redirects]]
+  from = "/sitemap.xml"
+  to   = "/sitemap.xml"
+  status = 200
+  force  = false
+
+[[redirects]]
+  from = "/robots.txt"
+  to   = "/robots.txt"
+  status = 200
+  force  = false
+
+[[redirects]]
+  from = "/google*.html"
+  to   = "/:splat"
+  status = 200
+  force  = false
+
 # ---- SPA Redirect Rule ----
-# All unmatched routes are rewritten to index.html so React Router handles routing.
+# All other unmatched routes are rewritten to index.html so React Router handles routing.
 [[redirects]]
   from = "/*"
   to = "/index.html"
