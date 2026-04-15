@@ -2,11 +2,10 @@
   "manifest_version": 3,
   "name": "GoPhishFree",
   "version": "1.0.0",
-  "description": "Phishing email detection for Gmail using local ML. Risk scores emails in real-time. No email content ever leaves your device.",
+  "description": "Phishing email detection for Gmail using local ML. Risk scores emails in real-time. By default, all analysis runs on-device.",
   "homepage_url": "https://gophishfree.com",
   "permissions": [
-    "storage",
-    "activeTab"
+    "storage"
   ],
   "host_permissions": [
     "https://mail.google.com/*",
