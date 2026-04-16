@@ -8,6 +8,7 @@ const TEAM = [
     contributions: "Project architecture, Random Forest ML pipeline, feature extraction engine, Chrome extension core, dataset curation, model training infrastructure.",
     initials: "TF",
     color: "#0d9488",
+    sameAs: ["https://www.linkedin.com/in/tyfarrington/", "https://github.com/TyFarrington"],
   },
   {
     name: "Andrew Reyes",
@@ -15,6 +16,7 @@ const TEAM = [
     contributions: "Fish Tank popup UI, content script UI components, Gmail DOM integration, deep scan UI, animation system.",
     initials: "AR",
     color: "#0891b2",
+    sameAs: ["https://www.linkedin.com/in/andrew-reyes1/", "https://github.com/Areyes42"],
   },
   {
     name: "Brett Suhr",
@@ -22,6 +24,7 @@ const TEAM = [
     contributions: "Background service worker, AI provider integrations (BYOK), security hardening, DNS-over-HTTPS implementation, vulnerability auditing.",
     initials: "BS",
     color: "#7c3aed",
+    sameAs: ["https://www.linkedin.com/in/brett-suhr-5a8bab24a/", "https://github.com/BrettSuhr"],
   },
   {
     name: "Nicholas Holmes",
@@ -29,6 +32,7 @@ const TEAM = [
     contributions: "BEC detection logic, header analysis, attachment risk scoring, email feature vector design, testing and validation.",
     initials: "NH",
     color: "#db2777",
+    sameAs: ["https://www.linkedin.com/in/nicholas-m-holmes/", "https://github.com/nicholasmholmes"],
   },
   {
     name: "Kaleb Howard",
@@ -36,6 +40,7 @@ const TEAM = [
     contributions: "Marketing website, documentation, sprint artifacts, Chrome Web Store submission materials, user-facing content.",
     initials: "KH",
     color: "#d97706",
+    sameAs: ["https://www.linkedin.com/in/kalebhoward/", "https://github.com/KalebHoward26"],
   },
 ];
 
@@ -62,11 +67,16 @@ export default function TeamPage() {
           "@id": `https://gophishfree.com/team#${m.name.replace(/\s+/g, "-").toLowerCase()}`,
           "name": m.name,
           "jobTitle": m.role,
+          "affiliation": {
+            "@type": "EducationalOrganization",
+            "name": "University of Kansas",
+          },
           "worksFor": {
             "@type": "Project",
             "name": "GoPhishFree",
             "url": "https://gophishfree.com",
           },
+          ...(m.sameAs ? { "sameAs": m.sameAs } : {}),
           "contributor": { "@id": "https://gophishfree.com/#app" },
         })),
       ],

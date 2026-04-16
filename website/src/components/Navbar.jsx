@@ -59,6 +59,7 @@ const navLinks = [
   { label: "How It Works", href: "#how-it-works" },
   { label: "Privacy", href: "#privacy" },
   { label: "FAQ", href: "#faq" },
+  { label: "Team", href: "/team", isRoute: true },
 ];
 
 /**
@@ -103,15 +104,17 @@ export default function Navbar() {
    * @param {string} href - The CSS selector for the target section (e.g., "#demo").
    * @returns {void}
    */
-  const handleNavClick = (e, href) => {
+  const handleNavClick = (e, href, isRoute) => {
     e.preventDefault();
     setIsMobileOpen(false);
+    if (isRoute) {
+      navigate(href);
+      return;
+    }
     if (isHomePage) {
-      // Already on home — just scroll to the section
       const el = document.querySelector(href);
       if (el) el.scrollIntoView({ behavior: "smooth" });
     } else {
-      // On a sub-page — navigate home and scroll after the page loads
       navigate("/");
       setTimeout(() => {
         const el = document.querySelector(href);
@@ -162,7 +165,7 @@ export default function Navbar() {
               <a
                 key={link.label}
                 href={link.href}
-                onClick={(e) => handleNavClick(e, link.href)}
+                onClick={(e) => handleNavClick(e, link.href, link.isRoute)}
                 style={{ color: "#94a3b8", fontSize: "1.125rem", fontWeight: 500, textDecoration: "none", transition: "color 0.3s" }}
                 onMouseEnter={e => { e.currentTarget.style.color = "white"; }}
                 onMouseLeave={e => { e.currentTarget.style.color = "#94a3b8"; }}
@@ -218,7 +221,7 @@ export default function Navbar() {
                 <a
                   key={link.label}
                   href={link.href}
-                  onClick={(e) => handleNavClick(e, link.href)}
+                  onClick={(e) => handleNavClick(e, link.href, link.isRoute)}
                   style={{ color: "#cbd5e1", fontSize: "1.125rem", fontWeight: 500, textDecoration: "none", padding: "0.5rem 0" }}
                 >
                   {link.label}

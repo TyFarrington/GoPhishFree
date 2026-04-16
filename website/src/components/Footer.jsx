@@ -150,6 +150,13 @@ export default function Footer() {
             Made with care for a safer inbox.
           </p>
         </div>
+        <p style={{ fontSize: "0.8rem", color: "#334155", marginTop: "0.75rem" }}>
+          Built by{" "}
+          <Link to="/team" style={{ color: "#475569", textDecoration: "underline", textUnderlineOffset: "2px" }}>
+            Ty Farrington, Andrew Reyes, Brett Suhr, Nicholas Holmes &amp; Kaleb Howard
+          </Link>
+          {" "}— University of Kansas Capstone Project
+        </p>
       </div>
     </footer>
   );
