@@ -7,6 +7,7 @@ const TEAM = [
     role: "Lead Developer & ML Engineer",
     contributions: "Project architecture, Random Forest ML pipeline, feature extraction engine, Chrome extension core, dataset curation, model training infrastructure.",
     initials: "TF",
+    photo: "/pfp/ty.jpg",
     color: "#0d9488",
     sameAs: ["https://www.linkedin.com/in/tyfarrington/", "https://github.com/TyFarrington"],
   },
@@ -15,6 +16,7 @@ const TEAM = [
     role: "Extension & UI Developer",
     contributions: "Fish Tank popup UI, content script UI components, Gmail DOM integration, deep scan UI, animation system.",
     initials: "AR",
+    photo: "/pfp/andrew.jpg",
     color: "#0891b2",
     sameAs: ["https://www.linkedin.com/in/andrew-reyes1/", "https://github.com/Areyes42"],
   },
@@ -23,6 +25,7 @@ const TEAM = [
     role: "Security & Backend Developer",
     contributions: "Background service worker, AI provider integrations (BYOK), security hardening, DNS-over-HTTPS implementation, vulnerability auditing.",
     initials: "BS",
+    photo: "/pfp/brett.jpg",
     color: "#7c3aed",
     sameAs: ["https://www.linkedin.com/in/brett-suhr-5a8bab24a/", "https://github.com/BrettSuhr"],
   },
@@ -31,6 +34,7 @@ const TEAM = [
     role: "Feature Engineering & QA",
     contributions: "BEC detection logic, header analysis, attachment risk scoring, email feature vector design, testing and validation.",
     initials: "NH",
+    photo: "/pfp/nick.jpg",
     color: "#db2777",
     sameAs: ["https://www.linkedin.com/in/nicholas-m-holmes/", "https://github.com/nicholasmholmes"],
   },
@@ -39,6 +43,7 @@ const TEAM = [
     role: "Website & Documentation",
     contributions: "Marketing website, documentation, sprint artifacts, Chrome Web Store submission materials, user-facing content.",
     initials: "KH",
+    photo: "/pfp/kaleb.jpg",
     color: "#d97706",
     sameAs: ["https://www.linkedin.com/in/kalebhoward/", "https://github.com/KalebHoward26"],
   },
@@ -129,8 +134,11 @@ export default function TeamPage() {
               border: `2px solid ${member.color}66`,
               display: "flex", alignItems: "center", justifyContent: "center",
               fontSize: "1.1rem", fontWeight: 700, color: member.color,
+              overflow: "hidden",
             }}>
-              {member.initials}
+              {member.photo
+                ? <img src={member.photo} alt={member.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                : member.initials}
             </div>
 
             <div style={{ flex: 1 }}>
